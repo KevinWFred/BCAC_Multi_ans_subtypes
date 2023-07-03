@@ -31,10 +31,10 @@ get_sampelnames=function(myfile=paste0(basedir,"onco/",onco_asian[1]))
   tmp=unlist(strsplit(tmp,"_"))
   return(tmp[seq(1,length(tmp),2)])
 }
-onco_asiansamples=get_sampelnames(paste0(basedir,"onco/",onco_asian[1])) #27515
-onco_africansamples=get_sampelnames(paste0(basedir,"onco/",onco_african[1])) #5804
-onco_hispanicsamples=get_sampelnames(paste0(basedir,"onco/",onco_hispanic[1])) #2560
-onco_europeansamples=get_sampelnames(paste0(basedir,"onco/",onco_european[1])) #133236
+onco_asiansamples=get_sampelnames(paste0(basedir,"onco/",onco_asian[2])) #27515
+onco_africansamples=get_sampelnames(paste0(basedir,"onco/",onco_african[2])) #5804
+onco_hispanicsamples=get_sampelnames(paste0(basedir,"onco/",onco_hispanic[2])) #2560
+onco_europeansamples=get_sampelnames(paste0(basedir,"onco/",onco_european[2])) #133236
 onco_gensamples=c(onco_asiansamples,onco_africansamples,onco_hispanicsamples,onco_europeansamples)
 onco_gensamples=onco_gensamples[onco_gensamples!=0]
 length(onco_gensamples) #169115
@@ -46,9 +46,9 @@ icogs_african=tmp[grepl("african",tmp)]
 icogs_european=tmp[grepl("euro",tmp)]
 length(icogs_asian)+length(icogs_african)+length(icogs_european)
 
-icogs_asiansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_asian[1])) #12500, first row is 0 0
-icogs_africansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_african[1])) #2047
-icogs_europeansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_european[1])) #99000
+icogs_asiansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_asian[2])) #12500, first row is 0 0
+icogs_africansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_african[2])) #2047
+icogs_europeansamples=get_sampelnames(paste0(basedir,"icogs/",icogs_european[2])) #99000
 
 length(intersect(onco_europeansamples,icogs_europeansamples)) #34157
 length(intersect(onco_asiansamples,icogs_asiansamples)) #1393
@@ -90,71 +90,7 @@ pheno_onco=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concep
 dim(pheno_onco)
 # [1] 172338     46
 table(pheno_onco$Onc_ID %in% onco_gensamples)
-#select case/control samples and create pheno file
-update_samplefile=function(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_1_p1.sample",
-                           prefix="zhang_750_euro_icogs_topmed_",
-                           pheno=pheno_icogs)
-{
-  outfolder=dirname(samplefile)
-  sampledat=read.table(samplefile,header = T,sep=" ")
-  #sampledat$SEX="D" #Sex code ('1' = male, '2' = female, '0' = unknown)
-  #sampledat$pheno="D" #	Binary ('0' = control, '1' = case) discrete (categorical, positive integers), or continuous phenotype; missing values represented by 'NA'
-  sampledat=sampledat[2:nrow(sampledat),]
-  sampleid=unlist(strsplit(sampledat$ID_1,"_"))
-  sampleid=sampleid[seq(1,length(sampleid),2)]
-  if (sum(colnames(pheno)=="SG_ID")>0)
-  {
-    pheno$ID=pheno$SG_ID
-  }else
-  {
-    pheno$ID=pheno$Onc_ID
-  }
-  tmp=sampleid[!sampleid %in% pheno$ID]
-  if (length(tmp)>0) warning(paste0(length(tmp)," samples not in phenotype file"))
-  sampleid=sampleid[sampleid %in% pheno$ID]
-  sampledat=sampledat[match(sampleid,sampleid),]
-  idx=match(sampleid,pheno$ID)
-  sampledat$SEX=2 
-  sampledat$pheno=pheno$Behaviour1[idx]
-   
-  sampledat$pheno[which(is.na(sampledat$pheno))]=0
-  sampledat$pheno[which(sampledat$pheno %in% c(2,888))]=NA
-  idx=which(!is.na(sampledat$pheno))
-  sampledat=sampledat[idx,]
-  print(table(sampledat$pheno))
-  plinksamplefile=paste0(outfolder,"/",prefix,"plinksamples.txt")
-  plinksample=data.frame(FID=sampledat$ID_1,IID=sampledat$ID_2)
-  write.table(plinksample,file=plinksamplefile,sep="\t",row.names = F,quote=F)
-  phenofile=paste0(outfolder,"/",prefix,"pheno.txt")
-  phenodat=sampledat[,-c(3,4)]
-  phenodat$pheno=phenodat$pheno+1 #change to 1 and 2
-  colnames(phenodat)[1:2]=c("FID","IID")
-  write.table(phenodat,file=phenofile,sep=" ",row.names = F,quote=F)
-}
-update_samplefile()
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_1.sample",
-                           prefix="zhang_750_asian_icogs_topmed_",
-                           pheno=pheno_icogs)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_african_icogs_topmed_1.sample",
-                  prefix="zhang_750_african_icogs_topmed_",
-                  pheno=pheno_icogs)
 
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_topmed_1_p1.sample",
-                  prefix="zhang_750_topmed_",
-                  pheno=pheno_onco)
-#53862 (0) 66012 (1), 5227 extra genotype
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_asian_topmed_1.sample",
-                  prefix="zhang_asian_750_topmed_",
-                  pheno=pheno_onco)
-#12578 (0) 12905 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_african_topmed_1.sample",
-                  prefix="zhang_african_750_topmed_",
-                  pheno=pheno_onco)
-#2088 (0) 3483 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_hispanic_topmed_1.sample",
-                  prefix="zhang_hispanic_750_topmed_",
-                  pheno=pheno_onco)
-#1218 (0) 1196 (1)
 #only include controls and invasives Behaviour1(1,888,NA):NAs are controls
 pheno_icogs_749=pheno_icogs_749[which(is.na(pheno_icogs_749$Behaviour1)| pheno_icogs_749$Behaviour1==1),]
 pheno_onco_749=pheno_onco_749[which(is.na(pheno_onco_749$Behaviour1)| pheno_onco_749$Behaviour1==1),]
@@ -261,6 +197,80 @@ pheno_onco=pheno_onco[pheno_onco$Onc_ID %in% onco_gensamples,]
 dim(pheno_onco)
 #151615     47
 
+#select case/control samples and create pheno file. Doesn't remove any specific studies
+update_samplefile=function(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_1_p1.sample",
+                           prefix="zhang_750_euro_icogs_topmed_",
+                           pheno=pheno_icogs)
+{
+  outfolder=dirname(samplefile)
+  sampledat=read.table(samplefile,header = T,sep=" ")
+  #change sampleID xxx_xxx to xxx
+  sampledat2=sampledat[2:nrow(sampledat),]
+  tmp=unlist(strsplit(sampledat2$ID_1,"_"))
+  sampledat2$ID_1=tmp[seq(1,length(tmp),2)]
+  sampledat2$ID_2=sampledat2$ID_1
+  sampledat=rbind(sampledat[1,],sampledat2)
+  newsamplefile=paste0(outfolder,"/",prefix,".sample")
+  write.table(sampledat,file=newsamplefile,sep="\t",row.names = F,quote=F)
+  #sampledat$SEX="D" #Sex code ('1' = male, '2' = female, '0' = unknown)
+  #sampledat$pheno="D" #	Binary ('0' = control, '1' = case) discrete (categorical, positive integers), or continuous phenotype; missing values represented by 'NA'
+  sampledat=sampledat[2:nrow(sampledat),]
+  # sampleid=unlist(strsplit(sampledat$ID_1,"_"))
+  # sampleid=sampleid[seq(1,length(sampleid),2)]
+  sampleid=sampledat$ID_1
+  if (sum(colnames(pheno)=="SG_ID")>0)
+  {
+    pheno$ID=pheno$SG_ID
+  }else
+  {
+    pheno$ID=pheno$Onc_ID
+  }
+  tmp=sampleid[!sampleid %in% pheno$ID]
+  if (length(tmp)>0) warning(paste0(length(tmp)," samples not in phenotype file"))
+  sampleid=sampleid[sampleid %in% pheno$ID]
+  sampledat=sampledat[match(sampleid,sampledat$ID_1),]
+  idx=match(sampleid,pheno$ID)
+  sampledat$SEX=2 
+  sampledat$pheno=pheno$Behaviour1[idx]
+  
+  sampledat$pheno[which(is.na(sampledat$pheno))]=0
+  sampledat$pheno[which(sampledat$pheno %in% c(2,888))]=NA
+  idx=which(!is.na(sampledat$pheno))
+  sampledat=sampledat[idx,]
+  print(table(sampledat$pheno))
+  plinksamplefile=paste0(outfolder,"/",prefix,"plinksamples.txt")
+  plinksample=data.frame(FID=sampledat$ID_1,IID=sampledat$ID_2)
+  write.table(plinksample,file=plinksamplefile,sep="\t",row.names = F,quote=F)
+  phenofile=paste0(outfolder,"/",prefix,"pheno.txt")
+  phenodat=sampledat[,-c(3,4)]
+  phenodat$pheno=phenodat$pheno+1 #change to 1 and 2
+  colnames(phenodat)[1:2]=c("FID","IID")
+  write.table(phenodat,file=phenofile,sep=" ",row.names = F,quote=F)
+}
+update_samplefile() #34059 (0) 38594 (1)
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_1.sample",
+                  prefix="zhang_750_asian_icogs_topmed_",
+                  pheno=pheno_icogs) #5940 (0) 4882 (1)
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_african_icogs_topmed_1.sample",
+                  prefix="zhang_750_african_icogs_topmed_",
+                  pheno=pheno_icogs) #817 (0) 941 (1)
+
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_topmed_1_p1.sample",
+                  prefix="zhang_750_topmed_",
+                  pheno=pheno_onco)
+#52500 (0) 65919 (1)
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_asian_topmed_1.sample",
+                  prefix="zhang_750_asian_topmed_",
+                  pheno=pheno_onco)
+#12344 (0) 12870 (1)
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_african_topmed_1.sample",
+                  prefix="zhang_750_african_topmed_",
+                  pheno=pheno_onco)
+#2088 (0) 3481 (1)
+update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_hispanic_topmed_1.sample",
+                  prefix="zhang_750_hispanic_topmed_",
+                  pheno=pheno_onco)
+#1218 (0) 1195 (1)
 
 #compare 749 and 750:
 idx=match(pheno_icogs_749$SG_ID,pheno_icogs$SG_ID)
@@ -754,12 +764,20 @@ length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$stu
 #sample used in analysis
 icogs_samples=pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm]
 write.table(icogs_samples,file="../result/icogs_samples_750.txt",row.names = F,col.names = F,quote=F)
+idx=match(icogs_samples,pheno_icogs$SG_ID)
+tmp=pheno_icogs$EthnicityGeno[idx]
+icogs_ana_eurosamples=icogs_samples[tmp=="European"]
+icogs_ana_asianamples=icogs_samples[tmp=="Asian"]
 sum(as.numeric(sup11$onco_ctrl),na.rm=T)+sum(as.numeric(sup11$onco_invasive),na.rm=T) #150464
 length(pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"])#150464
 sum(as.numeric(sup11$onco_ctrl),na.rm=T) #68150 control
 sum(as.numeric(sup11$onco_invasive),na.rm=T) #82314
 onco_samples=pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"]
 write.table(onco_samples,file="../result/onco_samples_750.txt",row.names = F,col.names = F,quote=F)
+idx=match(onco_samples,pheno_onco$Onc_ID)
+tmp=pheno_onco$EthnicityGeno[idx]
+onco_ana_eurosamples=onco_samples[tmp=="European"]
+onco_ana_asiansamples=onco_samples[tmp=="Asian"]
 # icogs_samples=read.table("../result/icogs_samples_750.txt")$V1
 # onco_samples=read.table("../result/onco_samples_750.txt")$V1
 # 
@@ -901,19 +919,60 @@ idx=which((pheno_onco1$ER_status1==0 & pheno_onco1$PR_status1==0) & pheno_onco1$
 sup44[2,5]=length(idx)
 write.csv(sup44,file="../result/supplement750_4.csv",row.names = F,quote=F)
 
-#check genotype data
-tmp=as.data.frame(fread('test.traw'))
-tmp=tmp[,1:1007]
-tmp1=unname(unlist(tmp[,7:1007]))
-quantile(tmp1,c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1))
-checkgeno=function(hardcall=0.1)
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_plinksamples.txt"))
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_plinksamples.txt"))
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_topmed_plinksamples.txt"))
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_asian_750_topmed_plinksamples.txt"))
+
+tmp1=unlist(strsplit(tmp$IID,"_"))
+tmp1=tmp1[seq(1,length(tmp1),2)]
+table(icogs_ana_eurosamples %in% tmp1)
+table(icogs_ana_asianamples %in% tmp1)
+table(onco_ana_eurosamples %in% tmp1)
+table(onco_ana_asiansamples %in% tmp1)
+
+tmp=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro_mergelist.txt")
+allpvar=NULL
+tmp1=data.frame(nsample=rep(0,nrow(tmp)),nvar=0,ndupsnp=0)
+for(i in 1:nrow(tmp1))
 {
-  idx=which(tmp1>hardcall & tmp1<1-hardcall | tmp1>1+hardcall & tmp1< 2-hardcall)
-  res=length(idx)/length(tmp1)
-  print(res)
+  if (i%%10==0) cat(i,'..')
+  tmp2=as.data.frame(fread(paste0(tmp$V1[i],".pvar")))
+  allpvar=rbind(allpvar,tmp2)
+  tmp1$nvar[i]=nrow(tmp2)
+  tmp1$ndupsnp[i]=sum(duplicated(tmp2$ID))
+  tmp2=read.table(paste0(tmp$V1[i],".psam"))
+  tmp1$nsample[i]=nrow(tmp2)
 }
-checkgeno(hardcall = 0.1) #17.89%
-checkgeno(hardcall = 0.2) #10.78%
-checkgeno(hardcall = 0.3) #6.43%
-checkgeno(hardcall = 0.4) #3.03%
-tmp2=as.data.frame(fread('test1.traw',nrows=100))
+
+tmp=as.data.frame(fread("test1.vcf.gz",nrows=20))
+tmp1=unname(unlist(tmp[1,10:ncol(tmp)]))
+idx=which(grepl(":$",tmp1))
+tmp1[idx]=paste0(tmp1[idx],"0.999")
+tmp[1,10:ncol(tmp)]=tmp1
+tmp2=unlist(strsplit(tmp1,":"))
+tmp3=tmp2[seq(1,length(tmp2),2)]
+tmp4=tmp2[seq(2,length(tmp2),2)]
+quantile(as.numeric(tmp4))
+tmp[1,10]="1/1:."
+write.table(tmp[1:1,],file="test.vcf",row.names = F,sep="\t",quote=F)
+
+tmp=as.data.frame(fread("../result/imp_onco/euro/euro_chr.1.1.pvar"))
+
+ldblock=read.table("/data/BB_Bioinformatics/ProjectData/ld_block/ld_block_EUR",header=T)
+pvar=as.data.frame(fread("../result/imp_icogs/euro/euro.pvar"))
+colnames(pvar)[1]="CHR"
+library(GenomicRanges)
+gr_pvar=GRanges(seqnames = pvar$CHR,ranges=IRanges(start=pvar$POS,width = 1))
+gr_ldblock=GRanges(seqnames = gsub("chr","",ldblock$chr),ranges=IRanges(ldblock$start,ldblock$stop-1))
+ldblock$numvar=NA
+for(i in 1:nrow(ldblock))
+{
+  ldblock$numvar[i]=length(subsetByOverlaps(gr_pvar,gr_ldblock[i]))
+}
+quantile(ldblock$numvar)
+# 0%   25%   50%   75%  100% 
+# 0  4409  5871  7563 16965
+sum(ldblock$numvar==0) #8
+which.max(ldblock$numvar) #966
+which.max(ldblock$len) #965
