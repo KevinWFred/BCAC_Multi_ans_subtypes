@@ -958,21 +958,35 @@ tmp[1,10]="1/1:."
 write.table(tmp[1:1,],file="test.vcf",row.names = F,sep="\t",quote=F)
 
 tmp=as.data.frame(fread("../result/imp_onco/euro/euro_chr.1.1.pvar"))
-
-ldblock=read.table("/data/BB_Bioinformatics/ProjectData/ld_block/ld_block_EUR",header=T)
-pvar=as.data.frame(fread("../result/imp_icogs/euro/euro.pvar"))
-colnames(pvar)[1]="CHR"
 library(GenomicRanges)
-gr_pvar=GRanges(seqnames = pvar$CHR,ranges=IRanges(start=pvar$POS,width = 1))
-gr_ldblock=GRanges(seqnames = gsub("chr","",ldblock$chr),ranges=IRanges(ldblock$start,ldblock$stop-1))
-ldblock$numvar=NA
-for(i in 1:nrow(ldblock))
+check_ld_block=function(infolder="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/geno/",
+                        pvarfile="../result/imp_icogs/euro/euro.pvar")
 {
-  ldblock$numvar[i]=length(subsetByOverlaps(gr_pvar,gr_ldblock[i]))
+  ldblock=read.table("/data/BB_Bioinformatics/ProjectData/ld_block/ld_block_EUR",header=T)
+  pvar=as.data.frame(fread(pvarfile))
+  colnames(pvar)[1]="CHR"
+  
+  gr_pvar=GRanges(seqnames = pvar$CHR,ranges=IRanges(start=pvar$POS,width = 1))
+  gr_ldblock=GRanges(seqnames = gsub("chr","",ldblock$chr),ranges=IRanges(ldblock$start,ldblock$stop-1))
+  ldblock$numvar=NA
+  for(i in 1:nrow(ldblock))
+  {
+    ldblock$numvar[i]=length(subsetByOverlaps(gr_pvar,gr_ldblock[i]))
+  }
+  quantile(ldblock$numvar)
+  # 0%   25%   50%   75%  100% 
+  # 0  4409  5871  7563 16965
+  print(sum(ldblock$numvar==0)) #8
+  which.max(ldblock$numvar) #966
+  which.max(ldblock$len) #965
+  allfiles=list.files(infolder,"*.traw.gz")
+  allids=gsub("geno_","",allfiles)
+  allids=as.numeric(gsub(".traw.gz","",allids,fixed=T))
+  tmp=0:(nrow(ldblock)-1)
+  missingids=tmp[!tmp %in% allids]
+  print(length(missingids))
+  print(ldblock$numvar[missingids+1])
+  return(ldblock)
 }
-quantile(ldblock$numvar)
-# 0%   25%   50%   75%  100% 
-# 0  4409  5871  7563 16965
-sum(ldblock$numvar==0) #8
-which.max(ldblock$numvar) #966
-which.max(ldblock$len) #965
+check_ld_block_onco=check_ld_block(infolder="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/geno/",
+                        pvarfile="../result/imp_onco/euro/euro.pvar")
