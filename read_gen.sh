@@ -45,7 +45,7 @@ read_seg(){
     fi
   done
   echo "merge data"
-  $plink2 --pmerge-list ${outfolder}${outprefix}_mergelist.txt --merge-max-allele-ct 2 --make-pgen --out ${outfolder}${outprefix} --memory 300000 --threads 45
+  $plink2 --pmerge-list ${outfolder}${outprefix}_mergelist.txt --make-pgen --out ${outfolder}${outprefix} --memory 300000 --threads 45
 }
 
 # read_seg(){

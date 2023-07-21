@@ -95,8 +95,9 @@ table(pheno_onco$Onc_ID %in% onco_gensamples)
 pheno_icogs_749=pheno_icogs_749[which(is.na(pheno_icogs_749$Behaviour1)| pheno_icogs_749$Behaviour1==1),]
 pheno_onco_749=pheno_onco_749[which(is.na(pheno_onco_749$Behaviour1)| pheno_onco_749$Behaviour1==1),]
 pheno_icogs=pheno_icogs[which(is.na(pheno_icogs$Behaviour1)| pheno_icogs$Behaviour1==1),]
+dim(pheno_icogs) #106604
 pheno_onco=pheno_onco[which(is.na(pheno_onco$Behaviour1)| pheno_onco$Behaviour1==1),]
-
+dim(pheno_onco) #161229
 
 #form age variable
 pheno_icogs_749$age=NA
@@ -145,6 +146,8 @@ pheno_icogs_749=pheno_icogs_749[!is.na(pheno_icogs_749$age),]
 pheno_onco_749=pheno_onco_749[!is.na(pheno_onco_749$age),]
 pheno_icogs=pheno_icogs[!is.na(pheno_icogs$age),]
 pheno_onco=pheno_onco[!is.na(pheno_onco$age),]
+dim(pheno_icogs) #103356
+dim(pheno_onco) #159502
 
 #remove overlap samples in icogs
 olapsamples=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/iCOGS_Onco_overlap_v15_list_for_investigators.txt",header=T,sep="\t")
@@ -190,12 +193,15 @@ dim(pheno_icogs)
 table(pheno_icogs$SG_ID %in% icogs_gensamples) #all pheno have genotype data
 # TRUE 
 # 85233
-table(pheno_onco$Onc_ID %in% onco_gensamples) #151615 pheno not have genotype data
+table(pheno_onco$Onc_ID %in% onco_gensamples) #7887 pheno not have genotype data
 # FALSE   TRUE 
 # 7887 151615 
 pheno_onco=pheno_onco[pheno_onco$Onc_ID %in% onco_gensamples,]
 dim(pheno_onco)
 #151615     47
+
+write.table(pheno_icogs,file="../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",row.names = F,sep="\t",quote=F)
+write.table(pheno_onco,file="../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",row.names = F,sep="\t",quote=F)
 
 #select case/control samples and create pheno file. Doesn't remove any specific studies
 update_samplefile=function(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_1_p1.sample",
@@ -699,7 +705,7 @@ for (i in 1:nrow(sup11))
   {
     idx=which(pheno_icogs$study==sup11$Acronym[i])
     n=length(idx)
-    if(length(idx)>0) sup11$icogs_ancestry[i]=pheno_icogs$EthnicityGeno[idx[1]]
+    if(length(idx)>0) sup11$icogs_ancestry[i]=paste0(unique(pheno_icogs$EthnicityGeno[idx]),collapse = "_")
     idx=which(pheno_icogs$study==sup11$Acronym[i] & is.na(pheno_icogs$Behaviour1))
     if (length(idx)>0) sup11$icogs_ctrl[i]=length(idx)
     n1=length(idx)
@@ -708,7 +714,7 @@ for (i in 1:nrow(sup11))
     n2=length(idx)
     if(n!=n1+n2) stop(i)
     idx=which(pheno_onco$study==sup11$Acronym[i])
-    if(length(idx)>0) sup11$onco_ancestry[i]=pheno_onco$EthnicityGeno[idx[1]]
+    if(length(idx)>0) sup11$onco_ancestry[i]=paste0(unique(pheno_onco$EthnicityGeno[idx]),collapse = "_")
     idx=which(pheno_onco$study==sup11$Acronym[i] & is.na(pheno_onco$Behaviour1)) 
     if (length(idx)>0) sup11$onco_ctrl[i]=length(idx)
     idx=which(pheno_onco$study==sup11$Acronym[i] & pheno_onco$Behaviour1==1)
@@ -764,6 +770,8 @@ length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$stu
 #sample used in analysis
 icogs_samples=pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm]
 write.table(icogs_samples,file="../result/icogs_samples_750.txt",row.names = F,col.names = F,quote=F)
+pheno_icogs_final=pheno_icogs[!pheno_icogs$study %in% study2rm,]
+dim(pheno_icogs_final) #80046
 idx=match(icogs_samples,pheno_icogs$SG_ID)
 tmp=pheno_icogs$EthnicityGeno[idx]
 icogs_ana_eurosamples=icogs_samples[tmp=="European"]
@@ -774,6 +782,8 @@ sum(as.numeric(sup11$onco_ctrl),na.rm=T) #68150 control
 sum(as.numeric(sup11$onco_invasive),na.rm=T) #82314
 onco_samples=pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"]
 write.table(onco_samples,file="../result/onco_samples_750.txt",row.names = F,col.names = F,quote=F)
+pheno_onco_final=pheno_onco[pheno_onco$StudyCountry!="Norway",]
+dim(pheno_onco_final) #150464
 idx=match(onco_samples,pheno_onco$Onc_ID)
 tmp=pheno_onco$EthnicityGeno[idx]
 onco_ana_eurosamples=onco_samples[tmp=="European"]
@@ -872,17 +882,48 @@ sup22=sup22[!sup22$Acronym %in% study2rm,]
 sup22=sup22[sup22$Acronym %in% sup11$Acronym,]
 sup22=sup22[order(sup22$Acronym),]
 write.csv(sup22,file="../result/supplement750_2.csv",row.names = F,quote=F)
+sup22=read.csv("../result/supplement750_2.csv")
+sup222=data.frame(marker=c(rep(c("ER","PR","HER2","Grade"),each=3),"Grade"),status=c(rep(c("Negative","Positive","Unkown"),3),c("1","2","3","Unknown")),N=NA,prop=NA)
+sup222$N[1]=sum(as.numeric(sup22$icogs_ERN),na.rm=T)+sum(as.numeric(sup22$onco_ERN),na.rm=T)
+sup222$N[2]=sum(as.numeric(sup22$icogs_ERP),na.rm=T)+sum(as.numeric(sup22$onco_ERP),na.rm=T)
+sup222$prop[1]=round(100*(sup222$N[1]/(sup222$N[1]+sup222$N[2])))
+sup222$prop[2]=100-sup222$prop[1]
+sup222$N[3]=sum(as.numeric(sup22$icogs_ERU),na.rm=T)+sum(as.numeric(sup22$onco_ERU),na.rm=T)
+sup222$N[4]=sum(as.numeric(sup22$icogs_PRN),na.rm=T)+sum(as.numeric(sup22$onco_PRN),na.rm=T)
+sup222$N[5]=sum(as.numeric(sup22$icogs_PRP),na.rm=T)+sum(as.numeric(sup22$onco_PRP),na.rm=T)
+sup222$prop[4]=round(100*(sup222$N[4]/(sup222$N[4]+sup222$N[5])))
+sup222$prop[5]=100-sup222$prop[4]
+sup222$N[6]=sum(as.numeric(sup22$icogs_PRU),na.rm=T)+sum(as.numeric(sup22$onco_PRU),na.rm=T)
+sup222$N[7]=sum(as.numeric(sup22$icogs_HER2N),na.rm=T)+sum(as.numeric(sup22$onco_HER2N),na.rm=T)
+sup222$N[8]=sum(as.numeric(sup22$icogs_HER2P),na.rm=T)+sum(as.numeric(sup22$onco_HER2P),na.rm=T)
+sup222$prop[7]=round(100*(sup222$N[7]/(sup222$N[7]+sup222$N[8])))
+sup222$prop[8]=100-sup222$prop[7]
+sup222$N[9]=sum(as.numeric(sup22$icogs_HER2U),na.rm=T)+sum(as.numeric(sup22$onco_HER2U),na.rm=T)
+sup222$N[10]=sum(as.numeric(sup22$icogs_grade1),na.rm=T)+sum(as.numeric(sup22$onco_grade1),na.rm=T)
+sup222$N[11]=sum(as.numeric(sup22$icogs_grade2),na.rm=T)+sum(as.numeric(sup22$onco_grade2),na.rm=T)
+sup222$N[12]=sum(as.numeric(sup22$icogs_grade3),na.rm=T)+sum(as.numeric(sup22$onco_grade3),na.rm=T)
+sup222$prop[10]=round(100*(sup222$N[10]/(sup222$N[10]+sup222$N[11]+sup222$N[12])))
+sup222$prop[11]=round(100*(sup222$N[11]/(sup222$N[10]+sup222$N[11]+sup222$N[12])))
+sup222$prop[12]=100-sup222$prop[10]-sup222$prop[11]
+sup222$N[13]=sum(as.numeric(sup22$icogs_gradeU),na.rm=T)+sum(as.numeric(sup22$onco_gradeU),na.rm=T)
+write.csv(sup222,file="../result/supplement750_22.csv",row.names = F,quote=F)
 
 #other is Hispanic
 sup33=data.frame(ancestry=c("European","Asian","African","other"),icogs_ctrl="",icogs_invasive="",onco_ctrl="",onco_invasive="")
 for (i in 1:4)
 {
-  idx=which(sup11$icogs_ancestry==sup33$ancestry[i])
-  sup33$icogs_ctrl[i]=sum(as.numeric(sup11$icogs_ctrl[idx]),na.rm=T)
-  sup33$icogs_invasive[i]=sum(as.numeric(sup11$icogs_invasive[idx]),na.rm=T)
-  idx=which(sup11$onco_ancestry==sup33$ancestry[i])
-  sup33$onco_ctrl[i]=sum(as.numeric(sup11$onco_ctrl[idx]),na.rm=T)
-  sup33$onco_invasive[i]=sum(as.numeric(sup11$onco_invasive[idx]),na.rm=T)
+  idx=which(pheno_icogs_final$EthnicityGeno==sup33$ancestry[i] & is.na(pheno_icogs_final$Behaviour1))
+  if (length(idx)>0)
+  sup33$icogs_ctrl[i]=length(idx)
+  idx=which(pheno_icogs_final$EthnicityGeno==sup33$ancestry[i] & pheno_icogs_final$Behaviour1==1)
+  if (length(idx)>0)
+    sup33$icogs_invasive[i]=length(idx)
+  idx=which(pheno_onco_final$EthnicityGeno==sup33$ancestry[i] & is.na(pheno_onco_final$Behaviour1))
+  if (length(idx)>0)
+  sup33$onco_ctrl[i]=length(idx)
+  idx=which(pheno_onco_final$EthnicityGeno==sup33$ancestry[i] & pheno_onco_final$Behaviour1==1)
+  if (length(idx)>0)
+  sup33$onco_invasive[i]=length(idx)
 }
 write.csv(sup33,file="../result/supplement750_3.csv",row.names = F,quote=F)
 
@@ -892,32 +933,63 @@ write.csv(sup33,file="../result/supplement750_3.csv",row.names = F,quote=F)
 # 2. (ER or PR)+, HER2+; # 3. (ER or PR)+, HER2-, grade 3; 
 # 4. (ER & PR)-, HER2-; 5. ER-PR-HER2-.
 
+sup44=function(myphenoicogs=pheno_icogs_final,myphenoonco=pheno_onco_final)
+{
+  sup44=data.frame(matrix(NA,nrow=2,ncol=5))
+  rownames(sup44)=c("icogs","onco")
+  colnames(sup44)=c("HRP_HER2N_lowgrade","HRP_HER2P","HRP_HER2N_highgrade","HRN_HER2P","HRN_HER2N")
+  idx=which((myphenoicogs$ER_status1==1|myphenoicogs$PR_status1==1) & myphenoicogs$HER2_status1==0 & myphenoicogs$Grade1 %in% c(1,2))
+  sup44[1,1]=length(idx)
+  idx=which((myphenoicogs$ER_status1==1|myphenoicogs$PR_status1==1) & myphenoicogs$HER2_status1==1)
+  sup44[1,2]=length(idx)
+  idx=which((myphenoicogs$ER_status1==1|myphenoicogs$PR_status1==1) & myphenoicogs$HER2_status1==0 & myphenoicogs$Grade1 %in% c(3))
+  sup44[1,3]=length(idx)
+  idx=which((myphenoicogs$ER_status1==0 & myphenoicogs$PR_status1==0) & myphenoicogs$HER2_status1==1)
+  sup44[1,4]=length(idx)
+  idx=which((myphenoicogs$ER_status1==0 & myphenoicogs$PR_status1==0) & myphenoicogs$HER2_status1==0)
+  sup44[1,5]=length(idx)
+  
+  idx=which((myphenoonco$ER_status1==1|myphenoonco$PR_status1==1) & myphenoonco$HER2_status1==0 & myphenoonco$Grade1 %in% c(1,2))
+  sup44[2,1]=length(idx)
+  idx=which((myphenoonco$ER_status1==1|myphenoonco$PR_status1==1) & myphenoonco$HER2_status1==1)
+  sup44[2,2]=length(idx)
+  idx=which((myphenoonco$ER_status1==1|myphenoonco$PR_status1==1) & myphenoonco$HER2_status1==0 & myphenoonco$Grade1 %in% c(3))
+  sup44[2,3]=length(idx)
+  idx=which((myphenoonco$ER_status1==0 & myphenoonco$PR_status1==0) & myphenoonco$HER2_status1==1)
+  sup44[2,4]=length(idx)
+  idx=which((myphenoonco$ER_status1==0 & myphenoonco$PR_status1==0) & myphenoonco$HER2_status1==0)
+  sup44[2,5]=length(idx)
+  return(sup44)
+}
+tmp=sup44()
+write.csv(tmp,file="../result/supplement750_4.csv",row.names = F,quote=F)
 
-sup44=data.frame(matrix(NA,nrow=2,ncol=5))
-rownames(sup44)=c("icogs","onco")
-colnames(sup44)=c("HRP_HER2N_lowgrade","HRP_HER2P","HRP_HER2N_highgrade","HRN_HER2P","HRN_HER2N")
-idx=which((pheno_icogs1$ER_status1==1|pheno_icogs1$PR_status1==1) & pheno_icogs1$HER2_status1==0 & pheno_icogs1$Grade1 %in% c(1,2))
-sup44[1,1]=length(idx)
-idx=which((pheno_icogs1$ER_status1==1|pheno_icogs1$PR_status1==1) & pheno_icogs1$HER2_status1==1)
-sup44[1,2]=length(idx)
-idx=which((pheno_icogs1$ER_status1==1|pheno_icogs1$PR_status1==1) & pheno_icogs1$HER2_status1==0 & pheno_icogs1$Grade1 %in% c(3))
-sup44[1,3]=length(idx)
-idx=which((pheno_icogs1$ER_status1==0 & pheno_icogs1$PR_status1==0) & pheno_icogs1$HER2_status1==1)
-sup44[1,4]=length(idx)
-idx=which((pheno_icogs1$ER_status1==0 & pheno_icogs1$PR_status1==0) & pheno_icogs1$HER2_status1==0)
-sup44[1,5]=length(idx)
+sup44_euro=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="European",],
+                 myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="European",])
+write.csv(sup44_euro,file="../result/supplement750_4_euro.csv",row.names = F,quote=F)
+sup44_asian=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="Asian",],
+                 myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="Asian",])
+write.csv(sup44_asian,file="../result/supplement750_4_asian.csv",row.names = F,quote=F)
+sup44_african=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="African",],
+                 myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="African",])
+write.csv(sup44_african,file="../result/supplement750_4_african.csv",row.names = F,quote=F)
+sup44_other=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="other",],
+                 myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="other",])
+write.csv(sup44_other,file="../result/supplement750_4_other.csv",row.names = F,quote=F)
 
-idx=which((pheno_onco1$ER_status1==1|pheno_onco1$PR_status1==1) & pheno_onco1$HER2_status1==0 & pheno_onco1$Grade1 %in% c(1,2))
-sup44[2,1]=length(idx)
-idx=which((pheno_onco1$ER_status1==1|pheno_onco1$PR_status1==1) & pheno_onco1$HER2_status1==1)
-sup44[2,2]=length(idx)
-idx=which((pheno_onco1$ER_status1==1|pheno_onco1$PR_status1==1) & pheno_onco1$HER2_status1==0 & pheno_onco1$Grade1 %in% c(3))
-sup44[2,3]=length(idx)
-idx=which((pheno_onco1$ER_status1==0 & pheno_onco1$PR_status1==0) & pheno_onco1$HER2_status1==1)
-sup44[2,4]=length(idx)
-idx=which((pheno_onco1$ER_status1==0 & pheno_onco1$PR_status1==0) & pheno_onco1$HER2_status1==0)
-sup44[2,5]=length(idx)
-write.csv(sup44,file="../result/supplement750_4.csv",row.names = F,quote=F)
+sup44=read.csv("../result/supplement750_4.csv")
+colnames(sup44)[which(colnames(sup44)=="HRP_HER2N_lowgrade")]="Luminal-A-like"
+colnames(sup44)[which(colnames(sup44)=="HRP_HER2N_highgrade")]="HER2-negative-like"
+colnames(sup44)[which(colnames(sup44)=="HRP_HER2P")]="Luminal-B-like"
+colnames(sup44)[which(colnames(sup44)=="HRN_HER2N")]="Triple-negative"
+colnames(sup44)[which(colnames(sup44)=="HRN_HER2P")]="HER2-enriched-like"
+sup444=data.frame(subtype=c("Luminal-A-like","HER2-negative-like","Luminal-B-like","HER2-enriched-like","Triple-negative"),
+                  N=NA,prop=0)
+idx=match(sup444$subtype,colnames(sup44))
+sup444$N=colSums(sup44[,idx])
+for (i in 1:4) sup444$prop[i]=round(sup444$N[i]/sum(sup444$N)*100)
+sup444$prop[5]=100-sum(sup444$prop[1:3])
+write.csv(sup444,file="../result/supplement750_44.csv",row.names = F,quote=F)
 
 tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_plinksamples.txt"))
 tmp=as.data.frame(fread("/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_plinksamples.txt"))
@@ -990,3 +1062,30 @@ check_ld_block=function(infolder="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_
 }
 check_ld_block_onco=check_ld_block(infolder="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/geno/",
                         pvarfile="../result/imp_onco/euro/euro.pvar")
+
+check_geno_block=function(prefix="../result/imp_onco/euro/euro")
+{
+  nvar=2000
+  pvar=as.data.frame(fread(paste0(prefix,".pvar")))
+  infolder=paste0(dirname(prefix),"/geno/")
+  allfiles=list.files(infolder,"\\w+.traw.gz")
+  allposfiles=list.files(infolder,"pos_\\d+.txt")
+  allidxs=gsub("pos_","",allposfiles)
+  allidxs=as.numeric(gsub(".txt","",allidxs,fixed = T))
+  allidxs=allidxs[order(allidxs)]
+  n=as.integer(nrow(pvar)/nvar)+1
+  tmp=1:n
+  missingblocks=tmp[!tmp %in% allidxs]
+  if (length(missingblocks)>0 ) warning(paste0(paste0(missingblocks,collapse = ",")," are missing"))
+  allsnps=NULL
+  for (i in 1:length(allidxs))
+  {
+    if (i %% 500==0) cat(i,'..')
+    tmp=as.data.frame(fread(paste0(infolder,"pos_",allidxs[i],".txt"),header=F))
+    allsnps=rbind(allsnps,tmp)
+  }
+  if (sum(duplicated(allsnps[,1]))>0) warning("duplicateds variants found")
+  if (nrow(allsnps)!=nrow(pvar)) warning("some variants are missing")
+}
+check_geno_block(prefix="../result/imp_onco/euro/euro")
+check_geno_block(prefix="../result/imp_icogs/euro/euro")
