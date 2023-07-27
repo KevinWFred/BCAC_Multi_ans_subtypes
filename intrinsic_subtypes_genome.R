@@ -286,6 +286,7 @@ if (file.exists(outfile))
   if (!is.null(loaddata))
   {
     print("Continue the job....")
+    print(Sys.time())
     if (nrow(all.log.odds)==ncol(x.test.all.mis1))
     {
       stop("All the job was done!")
@@ -294,74 +295,79 @@ if (file.exists(outfile))
   }
 }
 #for each variant
-for (i in ilast: ncol(x.test.all.mis1))
+if (ilast<ncol(x.test.all.mis1))
 {
-  
-  gene_value = x.test.all.mis1[,i,drop = F]
-  #Fit the two-stage model
-  #Two stage have several z design matrix structure
-  #baseline only assume all subtypes have the same effect
-  #additive assumes all higher order interactions across to be 0
-  #pair-wise interaction allows main effect and second order interactions across tumor markers
-  #saturated model allows all interactions
-  #we can also self design the z matrix
-  #in this setting, we self define the z matrix to make the definition align with intrinsic subtypes
-  #we only do this self define z matrix for genetic variant
-  #meanwhile, we keep the additive model for all other covariates
-  #Sys.time()
-  Heter.result=tryCatch(
-    expr = {
-      EMmvpolySelfDesign(y.pheno.mis1,
-                         x.self.design = gene_value,
-                         z.design=z.design,
-                         baselineonly = NULL,
-                         additive = x.covar.mis1,
-                         pairwise.interaction = NULL,
-                         saturated = NULL,missingTumorIndicator = 888)
-    },
-    error = function(e){ 
-      return(NULL)
-    })
-  # Heter.result = EMmvpolySelfDesign(y.pheno.mis1,
-  #                                        x.self.design = gene_value,
-  #                                        z.design=z.design,
-  #                                        baselineonly = NULL,
-  #                                        additive = x.covar.mis1,
-  #                                        pairwise.interaction = NULL,
-  #                                        saturated = NULL,missingTumorIndicator = 888)
-  #Sys.time()
-  
-  #the log-odds ratio for second-stage parameters are saved in the first elelment
-  #first M parameters are for intercept
-  #We don't make any assumptions regarding the intercept
-  #Therefore, the intercept has the same degree of freedom panelty as the M subtypes
-  #The next five parameters are for the genetic variants
-  #They represent the log-odds ratio for the five intrinsic subtypes
-  if (!is.null(Heter.result))
+  for (i in ilast: ncol(x.test.all.mis1))
   {
-    log.odds <- Heter.result[[1]][(M+1):(M+n.param)]
-    log.odds=as.data.frame(t(log.odds))
-    rownames(log.odds)=rownames(genodat)[i]
-    all.log.odds=rbind(all.log.odds,log.odds)
-    #nparm <- length(Heter.result[[1]])  
-    #variance matrix for the log-odds-ratio are saved in the second component
-    sigma.log.odds <- Heter.result[[2]][(M+1):(M+n.param),(M+1):(M+n.param)]
-    all.sigma.log.odds[[rownames(genodat)[i]]]=sigma.log.odds
-  }else
-  {
-    warning(paste0(i," ",rownames(genodat)[i]," notconverge"))
+    
+    gene_value = x.test.all.mis1[,i,drop = F]
+    #Fit the two-stage model
+    #Two stage have several z design matrix structure
+    #baseline only assume all subtypes have the same effect
+    #additive assumes all higher order interactions across to be 0
+    #pair-wise interaction allows main effect and second order interactions across tumor markers
+    #saturated model allows all interactions
+    #we can also self design the z matrix
+    #in this setting, we self define the z matrix to make the definition align with intrinsic subtypes
+    #we only do this self define z matrix for genetic variant
+    #meanwhile, we keep the additive model for all other covariates
+    #Sys.time()
+    Heter.result=tryCatch(
+      expr = {
+        EMmvpolySelfDesign(y.pheno.mis1,
+                           x.self.design = gene_value,
+                           z.design=z.design,
+                           baselineonly = NULL,
+                           additive = x.covar.mis1,
+                           pairwise.interaction = NULL,
+                           saturated = NULL,missingTumorIndicator = 888)
+      },
+      error = function(e){ 
+        return(NULL)
+      })
+    # Heter.result = EMmvpolySelfDesign(y.pheno.mis1,
+    #                                        x.self.design = gene_value,
+    #                                        z.design=z.design,
+    #                                        baselineonly = NULL,
+    #                                        additive = x.covar.mis1,
+    #                                        pairwise.interaction = NULL,
+    #                                        saturated = NULL,missingTumorIndicator = 888)
+    #Sys.time()
+    
+    #the log-odds ratio for second-stage parameters are saved in the first elelment
+    #first M parameters are for intercept
+    #We don't make any assumptions regarding the intercept
+    #Therefore, the intercept has the same degree of freedom panelty as the M subtypes
+    #The next five parameters are for the genetic variants
+    #They represent the log-odds ratio for the five intrinsic subtypes
+    if (!is.null(Heter.result))
+    {
+      log.odds <- Heter.result[[1]][(M+1):(M+n.param)]
+      log.odds=as.data.frame(t(log.odds))
+      rownames(log.odds)=rownames(genodat)[i]
+      all.log.odds=rbind(all.log.odds,log.odds)
+      #nparm <- length(Heter.result[[1]])  
+      #variance matrix for the log-odds-ratio are saved in the second component
+      sigma.log.odds <- Heter.result[[2]][(M+1):(M+n.param),(M+1):(M+n.param)]
+      all.sigma.log.odds[[rownames(genodat)[i]]]=sigma.log.odds
+    }else
+    {
+      warning(paste0(i," ",rownames(genodat)[i]," notconverge"))
+    }
+    
+    if (i %% 20==0)
+    {
+      ilast=i
+      cat(i,'..')
+      print(Sys.time())
+      save(ilast,all.log.odds,all.sigma.log.odds,file=outfile)
+    }
+    gc()
   }
-  
-  if (i %% 20==0)
-  {
-    ilast=i
-    cat(i,'..')
-    print(Sys.time())
-    save(ilast,all.log.odds,all.sigma.log.odds,file=outfile)
-  }
-}
+  ilast=i
+}  
 
-save(all.log.odds,all.sigma.log.odds,file=outfile)
+save(all.log.odds,all.sigma.log.odds,ilast,file=outfile)
 
 print("Done")
 print(Sys.time())

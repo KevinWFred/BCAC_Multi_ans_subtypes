@@ -32,21 +32,25 @@ if [ -f ${outfolder}/geno_${i1}.traw ]; then rm ${outfolder}/geno_${i1}.traw;fi
 echo `date +%c`
 echo "done"
 # #creat swarm file
-# if [ -f euro_onco_block.swarm ]; then rm euro_onco_block.swarm; fi
+# pop="euro"
+# pop="asian"
+# if [ -f ${pop}_onco_block.swarm ]; then rm ${pop}_onco_block.swarm; fi
 # totaljob=$((${#allsnp[@]}/$nvar+1))
 # echo $totaljob
 # for (( i =1 ; i<= $totaljob ; i++ ))
+# prefix=/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/${pop}/${pop}
 # do
-#   echo "/data/BB_Bioinformatics/Kevin/BCAC/code/form_genotype_block.sh $i /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro">>euro_onco_block.swarm
+#   echo "/data/BB_Bioinformatics/Kevin/BCAC/code/form_genotype_block.sh $i /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/${pop}/${pop}">>${pop}_onco_block.swarm
 # done
-# if [ -f euro_icogs_block.swarm ]; then rm euro_icogs_block.swarm; fi
+# if [ -f ${pop}_icogs_block.swarm ]; then rm ${pop}_icogs_block.swarm; fi
+# prefix=/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/${pop}/${pop}
 # for (( i =1 ; i<= $totaljob ; i++ ))
 # do
-#   echo "/data/BB_Bioinformatics/Kevin/BCAC/code/form_genotype_block.sh $i /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro">>euro_icogs_block.swarm
+#   echo "/data/BB_Bioinformatics/Kevin/BCAC/code/form_genotype_block.sh $i /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/${pop}/${pop}">>${pop}_icogs_block.swarm
 # done
-
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco_block.swarm -g 32   --time 0:20:00 --gres=lscratch:16 -b 100 -p 2
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs_block.swarm -g 32   --time 0:20:00 --gres=lscratch:16 -b 100 -p 2
+# cd swarm
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/${pop}_onco_block.swarm -g 32   --time 0:20:00 --gres=lscratch:16 -b 100 -p 2
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/${pop}_icogs_block.swarm -g 32   --time 0:20:00 --gres=lscratch:16 -b 100 -p 2
 
 
   
