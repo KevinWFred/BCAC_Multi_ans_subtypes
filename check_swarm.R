@@ -162,12 +162,18 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
         {
           res$running[i]=1
         }
-        
+        if (exists("ilast"))
+        {
+          if (ilast>=nvar)
+          {
+            res$finished[i]=1
+            ilast=1
+          }
+        }
       }else
       {
         res$cantload[i]=1
       }
-      
     }
   }
   
@@ -185,11 +191,13 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
   return(res)  
 }
 euro_onco=check_swarm()
-quantile(euro_onco$processed/2000)
+quantile(euro_onco$processed/2000,c(0,0.01,0.05,0.1,0.5,1))
+
 #euro_icogs=check_swarm(prefix="../result/imp_icogs/euro/euro",swarm=c(4476416,4476544,4761926,4764226,4864280,4864853,4929402,4930181,4947570,4968668,4969145,4970366,4978833,4979109,4996292,4998714,4999414,5059837))
 euro_icogs=check_swarm(prefix="../result/imp_icogs/euro/euro")
 
-quantile(euro_icogs$processed/2000)
+quantile(euro_icogs$processed/2000,c(0,0.01,0.05,0.1,0.5,1))
+
 resubmitjobs=function(dataopt="onco",pop="euro",swarmres=euro_onco)
 {
   #jobs not finished

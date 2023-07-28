@@ -134,7 +134,7 @@ args = commandArgs(trailingOnly = T)
 print(args)
 dataopt=args[1] #icogs or onco
 pop=args[2] #euro
-i1 = as.numeric(args[[3]]) #block ID, starts with 1
+i1 = as.numeric(args[3]) #block ID, starts with 1
 #output
 all.sigma.log.odds=list()
 all.log.odds=NULL
@@ -413,3 +413,12 @@ create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_ico
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 
+#asian
+#create_swarm(prefix="../result/imp_icogs/asian/asian",outprefix="asian_icogs",nvar=2000,dataopt="icogs",pop="asian")
+#create_swarm(prefix="../result/imp_onco/asian/asian",outprefix="asian_onco",nvar=2000,dataopt="onco",pop="asian")
+#cd swarm
+#each split into two files
+#5250404
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#5250450
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
