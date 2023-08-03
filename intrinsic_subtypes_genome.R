@@ -422,3 +422,7 @@ create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_ico
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 #5250450
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#5368353
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#5368394
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2

@@ -192,11 +192,12 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
 }
 euro_onco=check_swarm()
 quantile(euro_onco$processed/2000,c(0,0.01,0.05,0.1,0.5,1))
-
 #euro_icogs=check_swarm(prefix="../result/imp_icogs/euro/euro",swarm=c(4476416,4476544,4761926,4764226,4864280,4864853,4929402,4930181,4947570,4968668,4969145,4970366,4978833,4979109,4996292,4998714,4999414,5059837))
 euro_icogs=check_swarm(prefix="../result/imp_icogs/euro/euro")
-
 quantile(euro_icogs$processed/2000,c(0,0.01,0.05,0.1,0.5,1))
+
+asian_onco=check_swarm(prefix="../result/imp_onco/asian/asian")
+asian_icogs=check_swarm(prefix="../result/imp_icogs/asian/asian")
 
 resubmitjobs=function(dataopt="onco",pop="euro",swarmres=euro_onco)
 {
@@ -218,9 +219,11 @@ resubmitjobs=function(dataopt="onco",pop="euro",swarmres=euro_onco)
 }
 resubmitjobs()
 resubmitjobs(dataopt="icogs",pop="euro",swarmres=euro_icogs)
-
+resubmitjobs(pop="asian",swarmres=asian_onco)
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco3.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco4.swarm -g 10 --module R/4.3 --time=7-00:00:00 --gres=lscratch:8 -p 2
 
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs3.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs4.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#5512492
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco3.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
