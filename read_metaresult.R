@@ -251,6 +251,7 @@ plotmanhattan=function(data,title="",filename="../result/man_ILCCOnever.png")
          width=9, height=4, units="in", dpi=300)
 }
 
+#For European
 tmp=unlist(strsplit(rownames(allres),":"))
 allres$CHR=tmp[seq(1,length(tmp),4)]
 allres$CHR=gsub("chr","",allres$CHR)
@@ -338,6 +339,188 @@ plotqq(data=data,optbreak=0,title="")
 dev.off()
 plotmanhattan(data=data,title="",filename="../result/man_EURO_meta5.png")
 
+#For Asian
+pop="asian"
+load(paste0("../result/",pop,"_beta_sigma_pvalue.RData"))
+tmp=unlist(strsplit(rownames(allres),":"))
+allres$CHR=tmp[seq(1,length(tmp),4)]
+allres$CHR=gsub("chr","",allres$CHR)
+allres$BP=tmp[seq(2,length(tmp),4)]
+allres$SNP=rownames(allres)
+N=1/(1/5940+1/4882)+1/(1/12344+1/12870)
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian.afreq"))
+allres$EAF=0.05
+tmp1=intersect(allres$SNP,tmp$ID)
+idx1=match(tmp1,tmp$ID)
+idx2=match(tmp1,allres$SNP)
+allres$EAF[idx2]=tmp$ALT_FREQS[idx1]
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(meta_p1),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.01 & data$FREQ_A1<0.99,]
+png(filename = "../result/QQplot_ASN_meta1.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_ASN_meta1.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(meta_p2),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.01 & data$FREQ_A1<0.99,]
+png(filename = "../result/QQplot_ASN_meta2.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_ASN_meta2.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(meta_p3),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.01 & data$FREQ_A1<0.99,]
+png(filename = "../result/QQplot_ASN_meta3.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_ASN_meta3.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(meta_p4),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.01 & data$FREQ_A1<0.99,]
+png(filename = "../result/QQplot_ASN_meta4.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_ASN_meta4.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(meta_p5),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.01 & data$FREQ_A1<0.99,]
+png(filename = "../result/QQplot_ASN_meta5.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_ASN_meta5.png")
+
+#African, only using onco data
+pop="african"
+load(paste0("../result/",pop,"_beta_sigma_pvalue.RData"))
+tmp=unlist(strsplit(rownames(allres),":"))
+allres$CHR=tmp[seq(1,length(tmp),4)]
+allres$CHR=gsub("chr","",allres$CHR)
+allres$BP=tmp[seq(2,length(tmp),4)]
+allres$SNP=rownames(allres)
+N=1/(1/2088+1/3481)
+tmp=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african.afreq"))
+allres$EAF=0.05
+tmp1=intersect(allres$SNP,tmp$ID)
+idx1=match(tmp1,tmp$ID)
+idx2=match(tmp1,allres$SNP)
+allres$EAF[idx2]=tmp$ALT_FREQS[idx1]
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(onco_p1),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.05 & data$FREQ_A1<0.95,]
+png(filename = "../result/QQplot_AFR_meta1.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_AFR_meta1.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(onco_p2),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.05 & data$FREQ_A1<0.95,]
+png(filename = "../result/QQplot_AFR_meta2.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_AFR_meta2.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(onco_p3),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.05 & data$FREQ_A1<0.95,]
+png(filename = "../result/QQplot_AFR_meta3.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_AFR_meta3.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(onco_p4),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.05 & data$FREQ_A1<0.95,]
+png(filename = "../result/QQplot_AFR_meta4.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_AFR_meta4.png")
+
+data = allres %>% 
+  mutate(CHR = as.integer(CHR),
+         BP = as.integer(BP),
+         FREQ_A1 = as.numeric(EAF),
+         P = as.numeric(onco_p5),
+         rsid = SNP,
+         N = as.integer(N)) %>% 
+  mutate(P = ifelse(P==0,1E-300,P)) %>% 
+  select(rsid,CHR,BP,FREQ_A1,P,N)
+data=data[data$FREQ_A1>0.05 & data$FREQ_A1<0.95,]
+png(filename = "../result/QQplot_AFR_meta5.png", width = 8, height = 8, units = "in",res=300)
+plotqq(data=data,optbreak=0,title="")
+dev.off()
+plotmanhattan(data=data,title="",filename="../result/man_AFR_meta5.png")
+
+
+
 euro=as.data.frame(fread("../result/imp_icogs/euro/euro.pvar"))
 asian=as.data.frame(fread("../result/imp_icogs/asian/asian.pvar"))
 african=as.data.frame(fread("../result/imp_icogs/african/african.pvar"))
@@ -358,3 +541,98 @@ tmp1=paste0(asian[,1],":",asian$POS)
 table(tmp %in% tmp1)
 # FALSE    TRUE 
 # 2024497    4464
+
+#generate files for meta-analysis
+for (pop in c("euro","asian","african"))
+{
+  print(pop)
+  load(paste0("../result/",pop,"_beta_sigma_pvalue.RData"))
+  tmp=unlist(strsplit(rownames(allres),":"))
+  #allres$CHR=tmp[seq(1,length(tmp),4)]
+  #allres$CHR=gsub("chr","",allres$CHR)
+  #allres$BP=tmp[seq(2,length(tmp),4)]
+  allres$SNP=rownames(allres)
+  allres$A1=tmp[seq(3,length(tmp),4)]
+  allres$A2=tmp[seq(4,length(tmp),4)]
+  if (pop=="euro")
+  {
+    N=1/(1/33505+1/33961)+1/(1/52500+1/64768)
+    tmp=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro.afreq"))
+    allres$EAF=0.05
+    tmp1=intersect(allres$SNP,tmp$ID)
+    idx1=match(tmp1,tmp$ID)
+    idx2=match(tmp1,allres$SNP)
+    allres$EAF[idx2]=tmp$ALT_FREQS[idx1]
+  }
+  if (pop=="asian")
+  {
+    N=1/(1/5940+1/4882)+1/(1/12344+1/12870)
+    tmp=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian.afreq"))
+    allres$EAF=0.05
+    tmp1=intersect(allres$SNP,tmp$ID)
+    idx1=match(tmp1,tmp$ID)
+    idx2=match(tmp1,allres$SNP)
+    allres$EAF[idx2]=tmp$ALT_FREQS[idx1]
+  }
+  if (pop=="african")
+  {
+    N=1/(1/2088+1/3481)
+    tmp=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african.afreq"))
+    allres$EAF=0.05
+    tmp1=intersect(allres$SNP,tmp$ID)
+    idx1=match(tmp1,tmp$ID)
+    idx2=match(tmp1,allres$SNP)
+    allres$EAF[idx2]=tmp$ALT_FREQS[idx1]
+  }
+  allres$N=N
+  for (i in 1:5)
+  {
+    if (pop!="african")
+    {
+      res=data.frame(SNP=allres$SNP,A1=allres$A1,A2=allres$A2,EAF=allres$EAF,N=allres$N,SE=allres[,paste0("meta_se",i)],Beta=allres[,paste0("meta_beta",i)],P=allres[,paste0("meta_p",i)])
+    }else
+    {
+      res=data.frame(SNP=allres$SNP,A1=allres$A1,A2=allres$A2,EAF=allres$EAF,N=allres$N,SE=allres[,paste0("onco_se",i)],Beta=allres[,paste0("onco_beta",i)],P=allres[,paste0("onco_p",i)])
+    }
+    
+    fwrite(res,file=paste0("../result/",pop,"_type",i,"_metalinput.txt"),row.names = F,sep="\t",quote=F)
+  }
+}
+
+metainput_euro=as.data.frame(fread(paste0("../result/","euro","_type",1,"_metalinput.txt")))
+metainput_asian=as.data.frame(fread(paste0("../result/","asian","_type",1,"_metalinput.txt")))
+metainput_african=as.data.frame(fread(paste0("../result/","african","_type",1,"_metalinput.txt")))
+
+plot_meta=function(type=1)
+{
+  data=as.data.frame(fread(paste0("/data/BB_Bioinformatics/Kevin/BCAC/result/meta_type",type,"1.tbl")))
+  tmp=unlist(strsplit(data$MarkerName,":"))
+  #HetDf = the number of degrees of freedom (i.e. non-missing studies minus one) in the meta-analysis for each variant.
+  data$CHR=gsub("chr","",tmp[seq(1,length(tmp),4)])
+  data$BP=tmp[seq(2,length(tmp),4)]
+  data$N=0
+  idx=which(data$MarkerName %in% metainput_euro$SNP)
+  data$N[idx]=data$N[idx]+metainput_euro$N[1]
+  idx=which(data$MarkerName %in% metainput_asian$SNP)
+  data$N[idx]=data$N[idx]+metainput_asian$N[1]
+  idx=which(data$MarkerName %in% metainput_african$SNP)
+  data$N[idx]=data$N[idx]+metainput_african$N[1]
+  data = data %>% 
+    mutate(CHR = as.integer(CHR),
+           BP = as.integer(BP),
+           FREQ_A1 = as.numeric(Freq1),
+           P = as.numeric(`P-value`),
+           rsid = MarkerName,
+           N = as.integer(N)) %>% 
+    mutate(P = ifelse(P==0,1E-300,P)) %>% 
+    select(rsid,CHR,BP,FREQ_A1,P,N)
+  png(filename = paste0("../result/QQplot_meta_type",type,".png"), width = 8, height = 8, units = "in",res=300)
+  plotqq(data=data,optbreak=0,title="")
+  dev.off()
+  plotmanhattan(data=data,title="",filename=paste0("../result/man_meta_type",type,".png"))
+}
+plot_meta()
+plot_meta(type=2)
+plot_meta(type=3)
+plot_meta(type=4)
+plot_meta(type=5)

@@ -135,16 +135,14 @@ print(args)
 dataopt=args[1] #icogs or onco
 pop=args[2] #euro
 i1 = as.numeric(args[3]) #block ID, starts with 1
-#output
-all.sigma.log.odds=list()
-all.log.odds=NULL
+
 #genotype file
 #genofile=args[2]# "../result/icogs_test.traw" or "../result/onco_test.traw"
 if (dataopt=="icogs")
 {
   genofile=paste0("../result/imp_icogs/",pop,"/geno/geno_",i1,".traw.gz")
   if (!file.exists(genofile)) stop("no variants in this block!")
-  outfolder=paste0("../result/imp_icogs/",pop,"/res")
+  outfolder=paste0("../result/imp_icogs/",pop,"/scoretest")
   if (!dir.exists(outfolder)) dir.create(outfolder)
   #all the samples, some of them will not be used.
   pheno=read.table("../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",header=T,sep="\t")
@@ -154,12 +152,16 @@ if (dataopt=="icogs")
 {
   genofile=paste0("../result/imp_onco/",pop,"/geno/geno_",i1,".traw.gz")
   if (!file.exists(genofile)) stop("no variants in this block!")
-  outfolder=paste0("../result/imp_onco/",pop,"/res")
+  outfolder=paste0("../result/imp_onco/",pop,"/scoretest")
   if (!dir.exists(outfolder)) dir.create(outfolder)
   pheno=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
   colnames(pheno)[which(colnames(pheno)=="Onc_ID")]="ID"
   samplefile="../result/onco_samples_750.txt"
 }
+
+#load the null hypothesis results for other covariates
+#this component will be needed in later ScoreTest
+load(paste0(outfolder,"/score.test.support.ERPRHER2Grade.Rdata"))
 
 #samples included in the analysis
 allsamples=read.table(samplefile)$V1
@@ -182,7 +184,6 @@ idx=match(allsamples,colnames(genodat))
 genodat=genodat[,idx]
 pheno=pheno[match(allsamples,pheno$ID),]
 #number of snps in the current block
-nsnps=nrow(genodat) 
 data1=pheno
 #behaviour1 to (0,1)
 data1$Behaviour1[which(is.na(data1$Behaviour1))]=0
@@ -195,89 +196,39 @@ y.pheno.mis1 <- cbind(data1$Behaviour1,data1$ER_status1,data1$PR_status1,data1$H
 colnames(y.pheno.mis1) <- c("Behaviour","ER","PR","HER2","Grade")
 #idx=which(is.na(y.pheno.mis1[,1]))
 #y.pheno.mis1[idx,1]
-#generate the z standard matrix
-#z standard matrix is link to link subtypes with tumor characteristics
-z.standard <- GenerateZstandard(y.pheno.mis1)
-#each row of z.standard represent a subtype
-#each column represent a tumor marker
-#e.g. first row is ER-PR-HER2-Grade 1
-#total number of subtypes
-#subtypes with less than 10 cases are automatically removed
-M <- nrow(z.standard)
-#construct the z design matrix for intrinsic subtypes
-#intrinsic subtypes are defined as follows
-#Luminal-A like: ER or PR +, HER2-, grade is 1 or 2
-#Luminal-B like: ER or PR +, HER2+
-#Luminal B HER2 negative-like: ER or PR+, HER2-, grade 3
-#HER2 enriched-like: both ER and PR-, HER2+
-#Triple negative: ER, PR, HER2-
-#Prepare z design matrix
-z.design <- matrix(0,M,5)
-#define Luminal-A like
-idx.1 <- which((z.standard[,1]==1|z.standard[,2]==1)
-               &z.standard[,3]==0
-               &(z.standard[,4]==1|z.standard[,4]==2))
-z.design[idx.1,1] <- 1
-#define Luminal-B like
-idx.2 <- which((z.standard[,1]==1|z.standard[,2]==1)
-               &z.standard[,3]==1)
-z.design[idx.2,2] <- 1
-#for Luminal B HER2 negative-like
-idx.3 <- which((z.standard[,1]==1|z.standard[,2]==1)
-               &z.standard[,3]==0
-               &z.standard[,4]==3)
-z.design[idx.3,3] <- 1
-#for HER2 enriched-like
-idx.4 <- which(z.standard[,1]==0&z.standard[,2]==0
-               &z.standard[,3]==1)
-z.design[idx.4,4] <- 1
-#for Triple negative
-idx.5 <- which(z.standard[,1]==0&z.standard[,2]==0
-               &z.standard[,3]==0)
-z.design[idx.5,5] <- 1
 
-#genotype data
-x.test.all.mis1 <- t(genodat)
-#prepare covariates table: PC1-10
-#we only adjusted PC1-10 in known SNPs analyses
-#in genome-wide analyses, we will need to adjust age and PC1-10
-#need to add age
-if ("pc1" %in% colnames(pheno)) #iCOGS
-{
-  allcov=c(paste0("plinkPC",1:10),"age")
-  tmp=read.table("../result/imp_icogs/merged1.eigenvec")
-  colnames(tmp)=c("ID",paste0("plinkPC",1:20))
-  tmp1=unlist(strsplit(tmp$ID,"_"))
-  tmp$ID=tmp1[seq(1,length(tmp1),2)]
-  idx=match(pheno$ID,tmp$ID)
-  pheno=cbind(pheno,tmp[idx,2:11])
-  
-}else
-{
-  allcov=c(paste0("PC_",1:10),"age")
-}
+##get the three different z design matrix
+z.design.list = GenerateZDesignCombination(y.pheno.mis1)
+z.additive = z.design.list[[1]]
+z.interaction = z.design.list[[2]]
+z.saturated = z.design.list[[3]]
+#number of second stage parameters
+#if use additive model
+n.second = ncol(z.additive)
+#if use pair-wise interaction model
+#n.second = ncol(z.interaction)
+#if use saturated model
+#n.second = ncol(z.saturated)
 
-x.covar.mis1 =pheno[,allcov]
-#x.covar.mis1 <- data1[,5:14]
+#number of subject in the genotype file is n
+n=ncol(genodat)
+#count the number of variants in the file
+num=nrow(genodat)
+all(pheno$ID==colnames(genodat))
+idx.control <- which(y.pheno.mis1[,1]==0)
+#count the number of control in the data
+n.control <- length(idx.control)
 
-#################################
-#this section is not important
-#it's mainly used to convert the effect-size to minor allele
-#no need for this in analyses
-# idx.control <- which(y.pheno.mis1[,1]==0)
-# maf <- sum(x.test.all.mis1[idx.control,i1])/(2*length(idx.control))
-# if(maf>=0.5){
-#   x.test.all.mis1[,i1] < 2 - x.test.all.mis1[,i1]
-# }
-#################################
-
-
-# x.all.mis1 <- as.matrix(cbind(x.test.all.mis1[,i1],x.covar.mis1))
-# colnames(x.all.mis1)[1] <- "gene"
-
-n.param <- ncol(z.design)
 #output file
 outfile=paste0(outfolder,"/res_",i1,".RData")
+
+#output for each variant
+freq.all=rep(NA,num)
+names(freq.all)=rownames(genodat)
+score_result=data.frame(matrix(NA,nrow=num,ncol=n.second))
+infor_result=data.frame(matrix(NA,nrow=num,ncol=n.second^2))
+rownames(score_result)=rownames(infor_result)=rownames(genodat)
+
 ilast=1
 #if part of the job is done
 if (file.exists(outfile))
@@ -294,93 +245,72 @@ if (file.exists(outfile))
   {
     print("Continue the job....")
     print(Sys.time())
-    if (nrow(all.log.odds)==ncol(x.test.all.mis1))
+    if (ilast>=nrow(genodat))
     {
       stop("All the job was done!")
     }
     ilast=ilast+1 #the next one
   }
 }
-#for each variant
-if (ilast<ncol(x.test.all.mis1))
+
+if (ilast<=nrow(genodat))
 {
-  for (i in ilast: ncol(x.test.all.mis1))
+  for (i in ilast: nrow(genodat))
   {
     
-    gene_value = x.test.all.mis1[,i,drop = F]
-    #Fit the two-stage model
-    #Two stage have several z design matrix structure
-    #baseline only assume all subtypes have the same effect
-    #additive assumes all higher order interactions across to be 0
-    #pair-wise interaction allows main effect and second order interactions across tumor markers
-    #saturated model allows all interactions
-    #we can also self design the z matrix
-    #in this setting, we self define the z matrix to make the definition align with intrinsic subtypes
-    #we only do this self define z matrix for genetic variant
-    #meanwhile, we keep the additive model for all other covariates
-    #Sys.time()
-    Heter.result=tryCatch(
-      expr = {
-        EMmvpolySelfDesign(y.pheno.mis1,
-                           x.self.design = gene_value,
-                           z.design=z.design,
-                           baselineonly = NULL,
-                           additive = x.covar.mis1,
-                           pairwise.interaction = NULL,
-                           saturated = NULL,missingTumorIndicator = 888)
-      },
-      error = function(e){ 
-        return(NULL)
-      })
-    # Heter.result = EMmvpolySelfDesign(y.pheno.mis1,
-    #                                        x.self.design = gene_value,
-    #                                        z.design=z.design,
-    #                                        baselineonly = NULL,
-    #                                        additive = x.covar.mis1,
-    #                                        pairwise.interaction = NULL,
-    #                                        saturated = NULL,missingTumorIndicator = 888)
-    #Sys.time()
-    
-    #the log-odds ratio for second-stage parameters are saved in the first elelment
-    #first M parameters are for intercept
-    #We don't make any assumptions regarding the intercept
-    #Therefore, the intercept has the same degree of freedom panelty as the M subtypes
-    #The next five parameters are for the genetic variants
-    #They represent the log-odds ratio for the five intrinsic subtypes
-    if (!is.null(Heter.result))
-    {
-      log.odds <- Heter.result[[1]][(M+1):(M+n.param)]
-      log.odds=as.data.frame(t(log.odds))
-      rownames(log.odds)=rownames(genodat)[i]
-      all.log.odds=rbind(all.log.odds,log.odds)
-      #nparm <- length(Heter.result[[1]])  
-      #variance matrix for the log-odds-ratio are saved in the second component
-      sigma.log.odds <- Heter.result[[2]][(M+1):(M+n.param),(M+1):(M+n.param)]
-      all.sigma.log.odds[[rownames(genodat)[i]]]=sigma.log.odds
+    snpvalue = genodat[i,,drop = F]
+    snpvalue.control <- snpvalue[idx.control]
+    freq <- sum(snpvalue.control,na.rm=T)/(2*n.control)
+    freq.all[i] <- freq
+    if(freq<0.006|freq>0.994){
+      #if the SNP is too rare, just keep as score 0.
+      score_result[i,] <- 0
+      infor_result[i,] <- 0.1
     }else
     {
-      warning(paste0(i," ",rownames(genodat)[i]," notconverge"))
+      result=tryCatch(
+        expr = {
+          score.test<- ScoreTest(y=y.pheno.mis1,
+                                 x=unlist(snpvalue),
+                                 second.stage.structure="additive",
+                                 score.test.support=score.test.support.ERPRHER2Grade,
+                                 missingTumorIndicator=888)
+        },
+        error = function(e){ 
+          return(NULL)
+        })
+      
+      if (!is.null(result))
+      {
+        #the first element is score
+        score_result[i,]  <- result[[1]]
+        #the second element is the efficient information matrix
+        infor_result[i,] <- as.vector(result[[2]])
+      }else
+      {
+        warning(paste0(i," ",rownames(genodat)[i]," don't converge"))
+      }
     }
     
-    if (i %% 20==0)
+    if (i %% 50==0)
     {
       ilast=i
       cat(i,'..')
       print(Sys.time())
-      save(ilast,all.log.odds,all.sigma.log.odds,file=outfile)
+      save(ilast,freq.all,score_result,infor_result,file=outfile)
     }
     gc()
   }
   ilast=i
 }  
 
-save(all.log.odds,all.sigma.log.odds,ilast,file=outfile)
+save(score_result,infor_result,freq.all,ilast,file=outfile)
 
 print("Done")
 print(Sys.time())
 
 #create swarm files
-create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_icogs",nvar=2000,pop="euro",dataopt="icogs")
+create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="scoretest_euro_icogs",nvar=2000,pop="euro",dataopt="icogs")
 {
   pvar=as.data.frame(fread(paste0(prefix,".pvar")))
   infolder=paste0(dirname(prefix),"/geno/")
@@ -398,50 +328,55 @@ create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_ico
   {
     if (i<m)
     {
-      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R",2000),
+      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/whole_genome_ERPRHER2Grade_fixed_baseline.R",2000),
                      dataopt=dataopt,pop=pop,i1=((i-1)*4000+1):(i*4000))
     }else
     {
-      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R"),
+      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/whole_genome_ERPRHER2Grade_fixed_baseline.R"),
                      dataopt=dataopt,pop=pop,i1=((i-1)*4000+1):n)
     }
     
     write.table(tmp,file=paste0(outprefix,i,".swarm"),sep="\t",quote=F,row.names = F,col.names = F)
   }
 }
+sum(sapply(ls(),function(x){object.size(get(x))}))/1E6
 #create_swarm()
-#create_swarm(prefix="../result/imp_onco/euro/euro",outprefix="euro_onco",nvar=2000,dataopt="onco")
+#create_swarm(prefix="../result/imp_onco/euro/euro",outprefix="scoretest_euro_onco",nvar=2000,dataopt="onco")
 
 #cd swarm
 #each split into two files
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco1.swarm -g 9 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco2.swarm -g 9 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#8383395
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_euro_icogs1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#8383396
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_euro_icogs2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#8453986,8466937
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_euro_onco1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
+#8453993,8466939
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_euro_onco2.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
 
-# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 
 #asian
-#create_swarm(prefix="../result/imp_icogs/asian/asian",outprefix="asian_icogs",nvar=2000,dataopt="icogs",pop="asian")
-#create_swarm(prefix="../result/imp_onco/asian/asian",outprefix="asian_onco",nvar=2000,dataopt="onco",pop="asian")
+#create_swarm(prefix="../result/imp_icogs/asian/asian",outprefix="scoretest_asian_icogs",nvar=2000,dataopt="icogs",pop="asian")
+#create_swarm(prefix="../result/imp_onco/asian/asian",outprefix="scoretest_asian_onco",nvar=2000,dataopt="onco",pop="asian")
 #cd swarm
 #each split into two files
-#5250404
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#5250450
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#5967147
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5967201
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#8902629
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_asian_onco1.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2
+#8902631
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_asian_onco2.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2
+#8902832
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_asian_icogs1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#8902898
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_asian_icogs2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 
 #african
-#create_swarm(prefix="../result/imp_onco/african/african",outprefix="african_onco",nvar=2000,dataopt="onco",pop="african")
-#5721379
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5721410
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5721447
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco3.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#create_swarm(prefix="../result/imp_onco/african/african",outprefix="scoretest_african_onco",nvar=2000,dataopt="onco",pop="african")
+#8909070
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_african_onco1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#8909396
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_african_onco2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#8909407
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/scoretest_african_onco3.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
 #create_swarm(prefix="../result/imp_icogs/african/african",outprefix="african_icogs",nvar=2000,dataopt="icogs",pop="african")
 #5994333
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_icogs1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2

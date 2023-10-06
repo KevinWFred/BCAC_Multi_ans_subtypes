@@ -9,7 +9,7 @@ plink2=/usr/local/apps/plink/2.3-alpha/plink2
 #number of var in each block
 nvar=2000
 
-i1="$1" #starts with 0
+i1="$1" #starts with 1
 echo $i1
 prefix="$2" #"/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro"
 outfolder=$(dirname $prefix)/geno
@@ -34,11 +34,12 @@ echo "done"
 # #creat swarm file
 # pop="euro"
 # pop="asian"
+pop="african"
 # if [ -f ${pop}_onco_block.swarm ]; then rm ${pop}_onco_block.swarm; fi
 # totaljob=$((${#allsnp[@]}/$nvar+1))
 # echo $totaljob
-# for (( i =1 ; i<= $totaljob ; i++ ))
 # prefix=/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/${pop}/${pop}
+# for (( i =1 ; i<= $totaljob ; i++ ))
 # do
 #   echo "/data/BB_Bioinformatics/Kevin/BCAC/code/form_genotype_block.sh $i /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/${pop}/${pop}">>${pop}_onco_block.swarm
 # done

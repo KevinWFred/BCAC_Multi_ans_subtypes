@@ -133,38 +133,98 @@ gzip ${outfolder}${outprefix}_chr22.traw
 # #for icogs
 # $plink2 --pfile /data/DCEGLeiSongData/Kevin/BCAC/result/imp_icogs/euro --keep ../result/icogs_keepsamples.txt --make-pgen --out /data/DCEGLeiSongData/Kevin/BCAC/result/imp_icogs/euro --threads 8 --memory 56000
 
+
+#compute AF
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro --freq --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro --memory 200000 --threads 10
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian --freq --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian --memory 100000 --threads 10 &
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african --freq --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african --memory 50000 --threads 10
+
+#merge icogs samples to run PCA
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro.bcf
+
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/asian/asian --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/asian/asian
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/asian/asian.bcf
+
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african.bcf
+
+# sed 's/^>chr/>/' /data/BB_Bioinformatics/Kevin/tools/database/hg38.fa > /data/BB_Bioinformatics/Kevin/tools/database/hg38_nochr.fa
+# bcftools norm --check-ref s -f /data/BB_Bioinformatics/Kevin/tools/database/hg38_nochr.fa /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african.bcf -o /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african1.bcf
+# bcftools stats /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african1.bcf > /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african1.txt
+# tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african1.bcf
+
+#bcftools norm --check-ref s -f /data/BB_Bioinformatics/Kevin/tools/database/human_g1k_v37.fasta /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african.bcf -o /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african2.bcf
+
+#merge based on IDs
+bcftools merge -m id /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro.bcf \
+ /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/asian/asian.bcf \
+ /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/african/african.bcf --threads 10 -o /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged.bcf
+
+$plink2 -bcf /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged.bcf dosage=DS --make-pgen --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged --memory 200000 --threads 10
+
+#merge onco samples to run pooled analysis
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro.bcf
+
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian.bcf
+
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african.bcf
+
+$plink2 --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/hispanic/hispanic --export bcf vcf-dosage=DS --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/hispanic/hispanic
+tabix /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/hispanic/hispanic.bcf
+
+#merge based on IDs
+bcftools merge -m id /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro.bcf \
+ /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian.bcf \
+ /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/hispanic/hispanic.bcf \
+ /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/african/african.bcf --threads 10 -o /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged.bcf
+
+$plink2 -bcf /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged.bcf dosage=DS --make-pgen --out /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged --memory 200000 --threads 10
+
 runPCA(){
   local inputfile=$1
   local outprefix=$2
   outfolder=$(dirname $inputfile)
   echo $outfolder
-  #$plink2 --pfile $inputfile --maf 0.01 --geno 0.05  --make-bed --out ${outfolder}/$outprefix --threads 48 --memory 300000
+  $plink2 --pfile $inputfile --maf 0.05 --geno 0.05  --make-pgen --out ${outfolder}/${outprefix}_MAF05 --threads 12 --memory 200000
 
   # First, we need to perform prunning 
   $plink2 \
-    --pfile ${outfolder}/$outprefix \
+    --pfile ${outfolder}/${outprefix}_MAF05 \
     --indep-pairwise 1000 50 0.05 \
     --exclude range /data/BB_Bioinformatics/Kevin/tools/other/exclusion_regions_hg38.txt\
-    --threads 48\
-    --memory 300000\
+    --threads 12\
+    --memory 200000\
     --out ${outfolder}/$outprefix
   
   $plink2 \
   --pfile ${outfolder}/$outprefix \
   --extract ${outfolder}/$outprefix.prune.in \
-  -threads 48\
-  --memory 300000\
+  -threads 12\
+  --memory 200000\
   --make-bed --out ${outfolder}/${outprefix}_pruned 
   
-  # Then we calculate the first 20 PCs
   $plink2 \
-    --bfile ${outfolder}/$outprefix \
+  --pfile ${outfolder}/$outprefix \
+  --extract ${outfolder}/$outprefix.prune.in \
+  -threads 12\
+  --memory 200000\
+  --make-pgen --out ${outfolder}/${outprefix}_pruned 
+  
+  # Then we calculate the first 10 PCs
+  $plink2 \
+    --pfile ${outfolder}/$outprefix \
     --extract ${outfolder}/$outprefix.prune.in \
-    --pca 20 \
-    --threads 48\
-    --memory 300000\
+    --pca 10 \
+    --threads 12\
+    --memory 200000\
     --out ${outfolder}/$outprefix
 }
 runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro euro
 runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro euro
+runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1 merged1
+runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 merged1
 

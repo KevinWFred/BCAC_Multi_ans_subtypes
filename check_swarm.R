@@ -138,7 +138,7 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
   
   currenttime=Sys.time()
   resfolder=paste0(dirname(prefix),"/res/")
-  res=data.frame(jobid=1:n,processed=0,running=0,finished=0,cantload=0)
+  res=data.frame(jobid=1:n,processed=0,ilast=0,running=0,finished=0,cantload=0)
   currenttime=Sys.time()
   for (i in 1:nrow(res))
   {
@@ -156,6 +156,7 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
       if (!is.null(loaddata))
       {
         res$processed[i]=nrow(all.log.odds)
+        res$ilast[i]=ilast
         thetime=file.info(resfile)$mtime
         timediff=as.numeric(difftime(currenttime,thetime,units = "hours"))
         if (timediff<3)
@@ -199,31 +200,43 @@ quantile(euro_icogs$processed/2000,c(0,0.01,0.05,0.1,0.5,1))
 asian_onco=check_swarm(prefix="../result/imp_onco/asian/asian")
 asian_icogs=check_swarm(prefix="../result/imp_icogs/asian/asian")
 
+african_onco=check_swarm(prefix="../result/imp_onco/african/african")
+
 resubmitjobs=function(dataopt="onco",pop="euro",swarmres=euro_onco)
 {
   #jobs not finished
-  idx=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed>0 & swarmres$processed %%20 ==0)
+  #idx=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed>0 & swarmres$processed %%20 ==0)
   idx=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed>0 & swarmres$processed<1975 & swarmres$jobid<nrow(swarmres))
-  tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R",length(idx)),
-                 dataopt=dataopt,pop=pop,i1=swarmres$jobid[idx])
-  write.table(tmp,file=paste0(pop,"_",dataopt,"3.swarm"),row.names = F,col.names = F,sep="\t",quote=F)
+  if (length(idx)>0)
+  {
+    tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R",length(idx)),
+                   dataopt=dataopt,pop=pop,i1=swarmres$jobid[idx])
+    write.table(tmp,file=paste0(pop,"_",dataopt,"_new1.swarm"),row.names = F,col.names = F,sep="\t",quote=F)
+  }
+  
   #jobs never running (it is the second job, and the first job quit)
   idx1=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed==0)
   if (length(idx1)>0)
   {
     tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R",length(idx1)),
                    dataopt=dataopt,pop=pop,i1=swarmres$jobid[idx1])
-    write.table(tmp,file=paste0(pop,"_",dataopt,"4.swarm"),row.names = F,col.names = F,sep="\t",quote=F)
+    write.table(tmp,file=paste0(pop,"_",dataopt,"_new2.swarm"),row.names = F,col.names = F,sep="\t",quote=F)
     
   }
 }
 resubmitjobs()
 resubmitjobs(dataopt="icogs",pop="euro",swarmres=euro_icogs)
 resubmitjobs(pop="asian",swarmres=asian_onco)
+resubmitjobs(dataopt="icogs",pop="asian",swarmres=asian_icogs)
+resubmitjobs(pop="african",swarmres=african_onco)
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco3.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco4.swarm -g 10 --module R/4.3 --time=7-00:00:00 --gres=lscratch:8 -p 2
 
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs3.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs4.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#5512492
-# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco3.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#6283044
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs_new1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
+#5512492,6081154
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco_new1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
+#6081953
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco_new1.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2

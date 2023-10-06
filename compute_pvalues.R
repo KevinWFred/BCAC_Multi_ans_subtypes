@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+#meta analysis within a population (for intrinsic_subtypes_genome.R)
 .libPaths(c("/data/wangx53",.libPaths()))
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 library(data.table)
@@ -122,7 +123,8 @@ LogoddsMetaAnalysis=function (logodds1, sigma1, logodds2, sigma2)
 #   print(Sys.time())
 # }
 
-readres=function(pop="euro",nvar=2000)
+#For african, set optreadicogs=F
+readres=function(pop="euro",nvar=2000,optreadicogs=T)
 {
   print(Sys.time())
   #prefixonco="../result/imp_onco/euro/euro"
@@ -178,41 +180,47 @@ readres=function(pop="euro",nvar=2000)
   }
   print(dim(beta_onco))
   print(Sys.time())
-  for (i in 1:nicogs)
+  if (optreadicogs)
   {
-    if (i %% 500 ==0) cat(i,'..')
-    resfile=paste0(icogsresfolder,"res_",i,".RData")
-    if (file.exists(resfile))
+    for (i in 1:nicogs)
     {
-      loaddata = tryCatch(
-        expr = {
-          load(resfile)
-        },
-        error = function(e){ 
-          return(NULL)
-        })
-      if (!is.null(loaddata))
+      if (i %% 500 ==0) cat(i,'..')
+      resfile=paste0(icogsresfolder,"res_",i,".RData")
+      if (file.exists(resfile))
       {
-        idx=match(names(all.sigma.log.odds),rownames(all.log.odds))
-        all.log.odds=all.log.odds[idx,]
-        allsigma_icogs=c(allsigma_icogs,all.sigma.log.odds)
-        beta_icogs=rbind(beta_icogs,all.log.odds)
-        tmp=do.call("rbind",all.sigma.log.odds)
-        colid=rep(1:5,times=nrow(all.log.odds))
-        rowid=1:nrow(tmp)
-        idx=as.matrix(data.frame(row=rowid,col=colid))
-        tmp1=tmp[idx]
-        tmp2=matrix(tmp1,ncol=5,byrow = T)
-        rownames(tmp2)=rownames(all.log.odds)
-        sigma_icogs=rbind(sigma_icogs,tmp2)
-      }else
-      {
-        warning(paste0(resfile," is missing"))
+        loaddata = tryCatch(
+          expr = {
+            load(resfile)
+          },
+          error = function(e){ 
+            return(NULL)
+          })
+        if (!is.null(loaddata))
+        {
+          idx=match(names(all.sigma.log.odds),rownames(all.log.odds))
+          all.log.odds=all.log.odds[idx,]
+          allsigma_icogs=c(allsigma_icogs,all.sigma.log.odds)
+          beta_icogs=rbind(beta_icogs,all.log.odds)
+          tmp=do.call("rbind",all.sigma.log.odds)
+          colid=rep(1:5,times=nrow(all.log.odds))
+          rowid=1:nrow(tmp)
+          idx=as.matrix(data.frame(row=rowid,col=colid))
+          tmp1=tmp[idx]
+          tmp2=matrix(tmp1,ncol=5,byrow = T)
+          rownames(tmp2)=rownames(all.log.odds)
+          sigma_icogs=rbind(sigma_icogs,tmp2)
+        }else
+        {
+          warning(paste0(resfile," is missing"))
+        }
       }
     }
+    print(dim(beta_icogs))
+    save(beta_icogs,beta_onco,sigma_icogs,sigma_onco,allsigma_icogs,allsigma_onco,file=paste0(outprefix,"_beta_sigma.RData"))
+  }else #not to save icogs results
+  {
+    save(beta_onco,sigma_onco,allsigma_onco,file=paste0(outprefix,"_beta_sigma.RData"))
   }
-  print(dim(beta_icogs))
-  save(beta_icogs,beta_onco,sigma_icogs,sigma_onco,allsigma_icogs,allsigma_onco,file=paste0(outprefix,"_beta_sigma.RData"))
   print(Sys.time())
 }
 
@@ -291,6 +299,28 @@ compute_p=function(pop="euro")
  #      allres[idx[i],41:45]=p
  #    }
  #  }
+  
+  save(allres,file=paste0(outprefix,"_beta_sigma_pvalue.RData"))
+  print(Sys.time())
+  #return(allres)
+}
+
+compute_p_onco=function(pop="african")
+{
+  print(Sys.time())
+  #outprefix="../result/euro"
+  outprefix=paste0("../result/",pop)
+  #inputfile="../result/euro_beta_sigma.RData"
+  inputfile=paste0("../result/",pop,"_beta_sigma.RData")
+  load(inputfile)
+
+  allres=data.frame(matrix(NA,nrow=nrow(beta_onco),ncol=15))
+  rownames(allres)=rownames(beta_onco)
+  colnames(allres)=c(paste0("onco_beta",1:5),paste0("onco_se",1:5),paste0("onco_p",1:5))
+  allres[,1:5]=beta_onco
+  allres[,6:10]=sqrt(sigma_onco)
+  z=beta_onco/sqrt(sigma_onco)
+  allres[,11:15] = 2*pnorm(as.matrix(-abs(z)), lower.tail = T)
   
   save(allres,file=paste0(outprefix,"_beta_sigma_pvalue.RData"))
   print(Sys.time())
@@ -390,7 +420,7 @@ compute_metap=function(pop="euro",idxstart=1,idxend=10)
   save(allmetares,file=paste0(outfolder,"/res_",i1,".RData"))
 }
 
-res=compute_metap(pop="euro",idxstart=startendidx[1],idxend=startendidx[2])
+res=compute_metap(pop=pop,idxstart=startendidx[1],idxend=startendidx[2])
 
 print(Sys.time())
 print("done")
@@ -407,5 +437,7 @@ createswarm=function(pop="euro")
 #cd swarm
 #5504190
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/compute_metap_euro.swarm -g 30 --module R/4.3 --partition=quick --time=4:00:00 --gres=lscratch:30 -p 2
+#6366975
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/compute_metap_asian.swarm -g 30 --module R/4.3 --partition=quick --time=4:00:00 --gres=lscratch:30 -p 2
 
 

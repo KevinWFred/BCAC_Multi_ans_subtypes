@@ -190,6 +190,7 @@ length(icogssamples_torm) #18123
 pheno_icogs=pheno_icogs[!pheno_icogs$SG_ID %in% icogssamples_torm,]
 dim(pheno_icogs)
 #85233    48
+
 table(pheno_icogs$SG_ID %in% icogs_gensamples) #all pheno have genotype data
 # TRUE 
 # 85233
@@ -200,8 +201,26 @@ pheno_onco=pheno_onco[pheno_onco$Onc_ID %in% onco_gensamples,]
 dim(pheno_onco)
 #151615     47
 
-write.table(pheno_icogs,file="../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",row.names = F,sep="\t",quote=F)
-write.table(pheno_onco,file="../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",row.names = F,sep="\t",quote=F)
+#write.table(pheno_icogs,file="../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",row.names = F,sep="\t",quote=F)
+#write.table(pheno_onco,file="../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",row.names = F,sep="\t",quote=F)
+
+#remove icogs African
+table(pheno_icogs$EthnicityGeno)
+# African    Asian European 
+# 1758    10822    72653 
+unique(pheno_icogs$study[pheno_icogs$EthnicityGeno=="African"])
+#"NBHS" "SCCS"
+pheno_icogs=pheno_icogs[pheno_icogs$EthnicityGeno!="African",]
+dim(pheno_icogs)
+#83475    48
+table(pheno_onco$EthnicityGeno)
+# African    Asian European    other 
+# 5569    25214   118419     2413
+unique(pheno_onco$study[pheno_onco$EthnicityGeno=="other"])
+#"CAMA"    "COLBCCC"
+pheno_onco=pheno_onco[pheno_onco$EthnicityGeno!="other",]
+dim(pheno_onco)
+#149202     47
 
 #select case/control samples and create pheno file. Doesn't remove any specific studies
 update_samplefile=function(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_euro_icogs_topmed_1_p1.sample",
@@ -253,30 +272,30 @@ update_samplefile=function(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/
   colnames(phenodat)[1:2]=c("FID","IID")
   write.table(phenodat,file=phenofile,sep=" ",row.names = F,quote=F)
 }
-update_samplefile() #34059 (0) 38594 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_1.sample",
-                  prefix="zhang_750_asian_icogs_topmed_",
-                  pheno=pheno_icogs) #5940 (0) 4882 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_african_icogs_topmed_1.sample",
-                  prefix="zhang_750_african_icogs_topmed_",
-                  pheno=pheno_icogs) #817 (0) 941 (1)
-
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_topmed_1_p1.sample",
-                  prefix="zhang_750_topmed_",
-                  pheno=pheno_onco)
-#52500 (0) 65919 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_asian_topmed_1.sample",
-                  prefix="zhang_750_asian_topmed_",
-                  pheno=pheno_onco)
-#12344 (0) 12870 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_african_topmed_1.sample",
-                  prefix="zhang_750_african_topmed_",
-                  pheno=pheno_onco)
-#2088 (0) 3481 (1)
-update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_hispanic_topmed_1.sample",
-                  prefix="zhang_750_hispanic_topmed_",
-                  pheno=pheno_onco)
-#1218 (0) 1195 (1)
+# update_samplefile() #34059 (0) 38594 (1)
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_asian_icogs_topmed_1.sample",
+#                   prefix="zhang_750_asian_icogs_topmed_",
+#                   pheno=pheno_icogs) #5940 (0) 4882 (1)
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/icogs/zhang_750_african_icogs_topmed_1.sample",
+#                   prefix="zhang_750_african_icogs_topmed_",
+#                   pheno=pheno_icogs) #817 (0) 941 (1)
+# 
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_topmed_1_p1.sample",
+#                   prefix="zhang_750_topmed_",
+#                   pheno=pheno_onco)
+# #52500 (0) 65919 (1)
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_asian_topmed_1.sample",
+#                   prefix="zhang_750_asian_topmed_",
+#                   pheno=pheno_onco)
+# #12344 (0) 12870 (1)
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_african_topmed_1.sample",
+#                   prefix="zhang_750_african_topmed_",
+#                   pheno=pheno_onco)
+# #2088 (0) 3481 (1)
+# update_samplefile(samplefile="/data/BB_Bioinformatics/ProjectData/BCAC/onco/zhang_750_hispanic_topmed_1.sample",
+#                   prefix="zhang_750_hispanic_topmed_",
+#                   pheno=pheno_onco)
+# #1218 (0) 1195 (1)
 
 #compare 749 and 750:
 idx=match(pheno_icogs_749$SG_ID,pheno_icogs$SG_ID)
@@ -761,29 +780,98 @@ idx=which(sup11$icogs_ctrl!=""|sup11$icogs_invasive!=""|sup11$onco_ctrl!=""|sup1
 sup11=sup11[idx,]
 write.csv(sup11,file="../result/supplement750_1.csv",row.names = F,quote=F)
 sum(as.numeric(sup11$icogs_ctrl),na.rm=T)+sum(as.numeric(sup11$icogs_invasive),na.rm=T)
-#[1] 80046
-sum(as.numeric(sup11$icogs_ctrl),na.rm=T) #40262 control
-length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym &!pheno_icogs$study %in% study2rm &is.na(pheno_icogs$Behaviour1)]) #40262
-sum(as.numeric(sup11$icogs_invasive),na.rm=T) #39784 case
-length(pheno_icogs$SG_ID[which(pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm &pheno_icogs$Behaviour1==1)]) #39784
-length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm]) #80046
+#[1] 78288
+sum(as.numeric(sup11$icogs_ctrl),na.rm=T) #39445 control
+length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym &!pheno_icogs$study %in% study2rm &is.na(pheno_icogs$Behaviour1)]) #39445
+sum(as.numeric(sup11$icogs_invasive),na.rm=T) #38843 case
+length(pheno_icogs$SG_ID[which(pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm &pheno_icogs$Behaviour1==1)]) #38843
+length(pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm]) #78288
 #sample used in analysis
 icogs_samples=pheno_icogs$SG_ID[pheno_icogs$study %in% sup11$Acronym & !pheno_icogs$study %in% study2rm]
 write.table(icogs_samples,file="../result/icogs_samples_750.txt",row.names = F,col.names = F,quote=F)
 pheno_icogs_final=pheno_icogs[!pheno_icogs$study %in% study2rm,]
-dim(pheno_icogs_final) #80046
+dim(pheno_icogs_final) #78288
 idx=match(icogs_samples,pheno_icogs$SG_ID)
 tmp=pheno_icogs$EthnicityGeno[idx]
 icogs_ana_eurosamples=icogs_samples[tmp=="European"]
 icogs_ana_asianamples=icogs_samples[tmp=="Asian"]
-sum(as.numeric(sup11$onco_ctrl),na.rm=T)+sum(as.numeric(sup11$onco_invasive),na.rm=T) #150464
-length(pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"])#150464
-sum(as.numeric(sup11$onco_ctrl),na.rm=T) #68150 control
-sum(as.numeric(sup11$onco_invasive),na.rm=T) #82314
+sum(as.numeric(sup11$onco_ctrl),na.rm=T)+sum(as.numeric(sup11$onco_invasive),na.rm=T) #148051
+length(pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"])#148051
+sum(as.numeric(sup11$onco_ctrl),na.rm=T) #66932 control
+sum(as.numeric(sup11$onco_invasive),na.rm=T) #81119
 onco_samples=pheno_onco$Onc_ID[pheno_onco$study %in% sup11$Acronym & pheno_onco$StudyCountry!="Norway"]
 write.table(onco_samples,file="../result/onco_samples_750.txt",row.names = F,col.names = F,quote=F)
 pheno_onco_final=pheno_onco[pheno_onco$StudyCountry!="Norway",]
-dim(pheno_onco_final) #150464
+dim(pheno_onco_final) #148051
+
+#write.table(pheno_icogs_final,file="../data/concept_750_zhang_icogs_pheno_v15_02_age_used.txt",row.names = F,sep="\t",quote=F)
+#write.table(pheno_onco_final,file="../data/concept_750_zhang_onco_pheno_v15_02_corrected_age_used.txt",row.names = F,sep="\t",quote=F)
+#check correlation among ancestries
+
+allpheno=rbind(pheno_icogs_final[,c("ER_status1","PR_status1","HER2_status1","Grade1","EthnicityGeno")],
+               pheno_onco_final[,c("ER_status1","PR_status1","HER2_status1","Grade1","EthnicityGeno")])
+idx=which(allpheno==888,arr.ind = T)
+allpheno[idx]=NA
+idx=which(allpheno$EthnicityGeno=="European")
+tmp=allpheno[idx,1:4]
+round(cor(tmp,use = "complete.obs"),3)
+#              ER_status1 PR_status1 HER2_status1 Grade1
+# ER_status1        1.000      0.611       -0.159 -0.390
+# PR_status1        0.611      1.000       -0.167 -0.320
+# HER2_status1     -0.159     -0.167        1.000  0.202
+# Grade1           -0.390     -0.320        0.202  1.000
+idx=which(allpheno$EthnicityGeno=="Asian")
+tmp=allpheno[idx,1:4]
+round(cor(tmp,use = "complete.obs"),3)
+#              ER_status1 PR_status1 HER2_status1 Grade1
+# ER_status1        1.000      0.634       -0.186 -0.372
+# PR_status1        0.634      1.000       -0.169 -0.305
+# HER2_status1     -0.186     -0.169        1.000  0.250
+# Grade1           -0.372     -0.305        0.250  1.000
+idx=which(allpheno$EthnicityGeno=="African")
+tmp=allpheno[idx,1:4]
+round(cor(tmp,use = "complete.obs"),3)
+#              ER_status1 PR_status1 HER2_status1 Grade1
+# ER_status1        1.000      0.765       -0.028 -0.526
+# PR_status1        0.765      1.000       -0.086 -0.482
+# HER2_status1     -0.028     -0.086        1.000  0.126
+# Grade1           -0.526     -0.482        0.126  1.000
+# idx=which(allpheno$EthnicityGeno=="other")
+# tmp=allpheno[idx,1:4]
+# round(cor(tmp,use = "complete.obs"),3)
+# #              ER_status1 PR_status1 HER2_status1 Grade1
+# # ER_status1        1.000      0.795       -0.102 -0.244
+# # PR_status1        0.795      1.000       -0.183 -0.274
+# # HER2_status1     -0.102     -0.183        1.000  0.052
+# # Grade1           -0.244     -0.274        0.052  1.000
+
+#bar plot Within each ancestry, the proportion of ER+ among all cases
+pop=c("European","Asian","African")
+ancestry=c(rep("EUR",5),rep("ASN",5),rep("AFR",5))
+characteristics=c(rep(c("ER+","PR+","HER2+","Grade2","Grade3"),3))
+proportion=rep(NA,length(ancestry))
+for (i in 1:length(pop))
+{
+  n=(i-1)*5+1
+  idx=which(allpheno$EthnicityGeno==pop[i])
+  proportion[n]=sum(allpheno$ER_status1[idx]==1,na.rm = T)/sum(!is.na(allpheno$ER_status1[idx]))
+  proportion[n+1]=sum(allpheno$PR_status1[idx]==1,na.rm = T)/sum(!is.na(allpheno$PR_status1[idx]))
+  proportion[n+2]=sum(allpheno$HER2_status1[idx]==1,na.rm = T)/sum(!is.na(allpheno$HER2_status1[idx]))
+  proportion[n+3]=sum(allpheno$Grade1[idx]==2,na.rm = T)/sum(!is.na(allpheno$Grade1[idx]))
+  proportion[n+4]=sum(allpheno$Grade1[idx]==3,na.rm = T)/sum(!is.na(allpheno$Grade1[idx]))
+}
+data <- data.frame(ancestry,characteristics,proportion)
+# Grouped
+source("../../PRS_EASLC/code/theme_publication.R")
+pdf("../result/characteristics_ancestry_barplot.pdf",width = 12)
+ggplot(data, aes(fill=ancestry, y=proportion, x=characteristics)) + 
+  geom_bar(position="dodge", stat="identity")+theme_Publication()
+dev.off()
+pdf("../result/characteristics_ancestry_barplot1.pdf",width = 12)
+ggplot(data, aes(fill=characteristics, y=proportion, x=ancestry)) + 
+  geom_bar(position="dodge", stat="identity")+theme_Publication()
+dev.off()
+
 idx=match(onco_samples,pheno_onco$Onc_ID)
 tmp=pheno_onco$EthnicityGeno[idx]
 onco_ana_eurosamples=onco_samples[tmp=="European"]
@@ -878,7 +966,7 @@ for (i in 1:nrow(sup22))
     if (length(idx)>0) sup22$onco_gradeU[i]=length(idx)
   }
 }
-sup22=sup22[!sup22$Acronym %in% study2rm,]
+
 sup22=sup22[sup22$Acronym %in% sup11$Acronym,]
 sup22=sup22[order(sup22$Acronym),]
 write.csv(sup22,file="../result/supplement750_2.csv",row.names = F,quote=F)
@@ -973,9 +1061,49 @@ write.csv(sup44_asian,file="../result/supplement750_4_asian.csv",row.names = F,q
 sup44_african=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="African",],
                  myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="African",])
 write.csv(sup44_african,file="../result/supplement750_4_african.csv",row.names = F,quote=F)
-sup44_other=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="other",],
-                 myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="other",])
-write.csv(sup44_other,file="../result/supplement750_4_other.csv",row.names = F,quote=F)
+# sup44_other=sup44(myphenoicogs = pheno_icogs_final[pheno_icogs_final$EthnicityGeno=="other",],
+#                  myphenoonco = pheno_onco_final[pheno_onco_final$EthnicityGeno=="other",])
+# write.csv(sup44_other,file="../result/supplement750_4_other.csv",row.names = F,quote=F)
+#sup44_all=rbind(sup44_euro,sup44_asian,sup44_african,sup44_other)
+sup44_all=rbind(sup44_euro,sup44_asian,sup44_african)
+colnames(sup44_all)[which(colnames(sup44_all)=="HRP_HER2N_lowgrade")]="Luminal-A-like"
+colnames(sup44_all)[which(colnames(sup44_all)=="HRP_HER2N_highgrade")]="HER2-negative-like"
+colnames(sup44_all)[which(colnames(sup44_all)=="HRP_HER2P")]="Luminal-B-like"
+colnames(sup44_all)[which(colnames(sup44_all)=="HRN_HER2N")]="Triple-negative"
+colnames(sup44_all)[which(colnames(sup44_all)=="HRN_HER2P")]="HER2-enriched-like"
+tmp=data.frame(matrix(NA,nrow=4,ncol=ncol(sup44_all)))
+colnames(tmp)=colnames(sup44_all)
+for (i in 1:nrow(tmp))
+{
+  tmp[i,]=sup44_all[((i-1)*2+1),]+sup44_all[((i-1)*2+2),]
+}
+sup44_all=tmp
+#bar plot Within each ancestry, the proportion of subtypes among all cases
+pop=c("European","Asian","African")
+ancestry=c(rep("EUR",5),rep("ASN",5),rep("AFR",5))
+subtype=c(rep(colnames(sup44_all),length(pop)))
+proportion=rep(NA,length(ancestry))
+for (i in 1:length(pop))
+{
+  n=(i-1)*5+1
+  proportion[n]=sup44_all$`Luminal-A-like`[i]/sum(sup44_all[i,])
+  proportion[n+1]=sup44_all$`Luminal-B-like`[i]/sum(sup44_all[i,])
+  proportion[n+2]=sup44_all$`HER2-negative-like`[i]/sum(sup44_all[i,])
+  proportion[n+3]=sup44_all$`HER2-enriched-like`[i]/sum(sup44_all[i,])
+  proportion[n+4]=sup44_all$`Triple-negative`[i]/sum(sup44_all[i,])
+}
+data <- data.frame(ancestry,subtype,proportion)
+# Grouped
+pdf("../result/subtype_ancestry_barplot.pdf",width=12)
+ggplot(data, aes(fill=subtype, y=proportion, x=ancestry)) + 
+  geom_bar(position="dodge", stat="identity")+theme_Publication()
+dev.off()
+
+pdf("../result/subtype_ancestry_barplot1.pdf",width=12)
+ggplot(data, aes(fill=ancestry, y=proportion, x=subtype)) + 
+  geom_bar(position="dodge", stat="identity")+
+  theme_Publication()+theme(axis.text.x = element_text(size=15,angle = 90, vjust = 0.5, hjust=1))
+dev.off()
 
 sup44=read.csv("../result/supplement750_4.csv")
 colnames(sup44)[which(colnames(sup44)=="HRP_HER2N_lowgrade")]="Luminal-A-like"
@@ -1089,3 +1217,37 @@ check_geno_block=function(prefix="../result/imp_onco/euro/euro")
 }
 check_geno_block(prefix="../result/imp_onco/euro/euro")
 check_geno_block(prefix="../result/imp_icogs/euro/euro")
+
+#PLOT PCA on iCOGS
+pdf("../result/iCOGS_PCA.pdf")
+ggplot(pheno_icogs, aes(x=pc1, y=pc2, color=EthnicityGeno)) + geom_point() + 
+  labs(title="iCOGS")+ theme_Publication()
+dev.off()
+tmp=read.table("../result/imp_icogs/merged1.eigenvec")
+colnames(tmp)=c("ID",paste0("plinkPC",1:20))
+tmp1=unlist(strsplit(tmp$ID,"_"))
+tmp$ID=tmp1[seq(1,length(tmp1),2)]
+idx=match(pheno_icogs$SG_ID,tmp$ID)
+dat=cbind(pheno_icogs,tmp[idx,2:21])
+pdf("../result/iCOGS_plinkPCA.pdf")
+ggplot(dat, aes(x=plinkPC1, y=plinkPC2, color=EthnicityGeno)) + geom_point() + 
+  labs(title="iCOGS")+ theme_Publication()
+dev.off()
+#flashpca2
+load("../result/icogs_flashpca.RData")
+tmp=icogspca$projection
+colnames(tmp)=paste0("flashPC",1:10)
+tmp1=unlist(strsplit(rownames(tmp),":"))
+tmp1=unlist(strsplit(tmp1,"_"))
+rownames(tmp)=tmp1[seq(2,length(tmp1),3)]
+idx=match(pheno_icogs_final$SG_ID,rownames(tmp))
+dat=cbind(pheno_icogs_final,tmp[idx,])
+pdf("../result/iCOGS_flashPCA.pdf")
+ggplot(dat, aes(x=flashPC1, y=flashPC2, color=EthnicityGeno)) + geom_point() + 
+  labs(title="iCOGS")
+dev.off()
+
+pdf("../result/Onco_PCA.pdf")
+ggplot(pheno_onco_final, aes(x=PC_1, y=PC_2, color=EthnicityGeno)) + geom_point() + 
+  labs(title="Onco")
+dev.off()
