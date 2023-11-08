@@ -138,8 +138,12 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
   #intrinsic_subtypes 
   snpid=allnovelsnps1$ID[i1]
   condsnpid=allnovelsnps1$knownvar[i1]
+  condsnpid=unlist(strsplit(condsnpid,","))
+  condsnpid=c(snpid,condsnpid)
+  condsnpfile=paste0("../result/tmp/",snpid,".txt")
+  write.table(condsnpid,file=condsnpfile,row.names = F,col.names = F,quote=F)
   if (file.exists(paste0("../result/tmp/",snpid,".traw"))) file.remove(paste0("../result/tmp/",snpid,".traw"))
-  cmd=paste0(plink2," --pfile ../result/imp_",dataopt,"/",pop,"/",pop," --snps ",snpid,",",condsnpid," --memory 16000 --threads 1 --recode A-transpose --out ../result/tmp/",snpid)
+  cmd=paste0(plink2," --pfile ../result/imp_",dataopt,"/",pop,"/",pop," --extract ",condsnpfile," --memory 16000 --threads 1 --recode A-transpose --out ../result/tmp/",snpid)
   system(cmd)
   if (file.exists(paste0("../result/tmp/",snpid,".traw")))
   {
@@ -188,243 +192,249 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
     idx=rownames(genodat)==snpid
     condsnpdat=genodat[!idx,]
     genodat=genodat[idx,]
-    pheno=pheno[match(allsamples,pheno$ID),]
-    #number of snps in the current block
-    nsnps=nrow(genodat) 
-    data1=pheno
-    #behaviour1 to (0,1)
-    data1$Behaviour1[which(is.na(data1$Behaviour1))]=0
-    #prepare the phenotypes data for iCOGs 
-    y.pheno.mis1 <- cbind(data1$Behaviour1,data1$ER_status1,data1$PR_status1,data1$HER2_status1,data1$Grade1)
-    #ER, PR, HER2 is binary with negative as 0 and positive as 1
-    #Grade is ordinal with 1, 2, 3
-    #controls don't have tumor characteristics data (all NA)
-    #cases with missing tumor characteristics marked as 888
-    colnames(y.pheno.mis1) <- c("Behaviour","ER","PR","HER2","Grade")
-    #idx=which(is.na(y.pheno.mis1[,1]))
-    #y.pheno.mis1[idx,1]
-    #generate the z standard matrix
-    #z standard matrix is link to link subtypes with tumor characteristics
-    z.standard <- GenerateZstandard(y.pheno.mis1)
-    #each row of z.standard represent a subtype
-    #each column represent a tumor marker
-    #e.g. first row is ER-PR-HER2-Grade 1
-    #total number of subtypes
-    #subtypes with less than 10 cases are automatically removed
-    M <- nrow(z.standard)
-    #construct the z design matrix for intrinsic subtypes
-    #intrinsic subtypes are defined as follows
-    #Luminal-A like: ER or PR +, HER2-, grade is 1 or 2
-    #Luminal-B like: ER or PR +, HER2+
-    #Luminal B HER2 negative-like: ER or PR+, HER2-, grade 3
-    #HER2 enriched-like: both ER and PR-, HER2+
-    #Triple negative: ER, PR, HER2-
-    #Prepare z design matrix
-    z.design <- matrix(0,M,5)
-    #define Luminal-A like
-    idx.1 <- which((z.standard[,1]==1|z.standard[,2]==1)
-                   &z.standard[,3]==0
-                   &(z.standard[,4]==1|z.standard[,4]==2))
-    z.design[idx.1,1] <- 1
-    #define Luminal-B like
-    idx.2 <- which((z.standard[,1]==1|z.standard[,2]==1)
-                   &z.standard[,3]==1)
-    z.design[idx.2,2] <- 1
-    #for Luminal B HER2 negative-like
-    idx.3 <- which((z.standard[,1]==1|z.standard[,2]==1)
-                   &z.standard[,3]==0
-                   &z.standard[,4]==3)
-    z.design[idx.3,3] <- 1
-    #for HER2 enriched-like
-    idx.4 <- which(z.standard[,1]==0&z.standard[,2]==0
-                   &z.standard[,3]==1)
-    z.design[idx.4,4] <- 1
-    #for Triple negative
-    idx.5 <- which(z.standard[,1]==0&z.standard[,2]==0
-                   &z.standard[,3]==0)
-    z.design[idx.5,5] <- 1
-    
-    #genotype data
-    x.test.all.mis1 <- t(genodat)
-    #prepare covariates table: PC1-10
-    #we only adjusted PC1-10 in known SNPs analyses
-    #in genome-wide analyses, we will need to adjust age and PC1-10
-    #need to add age
-    if ("pc1" %in% colnames(pheno)) #iCOGS
+    if (sum(idx)>0 & sum(!idx)>0)
     {
-      allcov=c(paste0("plinkPC",1:10),"age")
-      tmp=read.table("../result/imp_icogs/merged1.eigenvec")
-      colnames(tmp)=c("ID",paste0("plinkPC",1:20))
-      tmp1=unlist(strsplit(tmp$ID,"_"))
-      tmp$ID=tmp1[seq(1,length(tmp1),2)]
-      idx=match(pheno$ID,tmp$ID)
-      pheno=cbind(pheno,tmp[idx,2:11])
+      pheno=pheno[match(allsamples,pheno$ID),]
+      data1=pheno
+      #behaviour1 to (0,1)
+      data1$Behaviour1[which(is.na(data1$Behaviour1))]=0
+      #prepare the phenotypes data for iCOGs 
+      y.pheno.mis1 <- cbind(data1$Behaviour1,data1$ER_status1,data1$PR_status1,data1$HER2_status1,data1$Grade1)
+      #ER, PR, HER2 is binary with negative as 0 and positive as 1
+      #Grade is ordinal with 1, 2, 3
+      #controls don't have tumor characteristics data (all NA)
+      #cases with missing tumor characteristics marked as 888
+      colnames(y.pheno.mis1) <- c("Behaviour","ER","PR","HER2","Grade")
+      #idx=which(is.na(y.pheno.mis1[,1]))
+      #y.pheno.mis1[idx,1]
+      #generate the z standard matrix
+      #z standard matrix is link to link subtypes with tumor characteristics
+      z.standard <- GenerateZstandard(y.pheno.mis1)
+      #each row of z.standard represent a subtype
+      #each column represent a tumor marker
+      #e.g. first row is ER-PR-HER2-Grade 1
+      #total number of subtypes
+      #subtypes with less than 10 cases are automatically removed
+      M <- nrow(z.standard)
+      #construct the z design matrix for intrinsic subtypes
+      #intrinsic subtypes are defined as follows
+      #Luminal-A like: ER or PR +, HER2-, grade is 1 or 2
+      #Luminal-B like: ER or PR +, HER2+
+      #Luminal B HER2 negative-like: ER or PR+, HER2-, grade 3
+      #HER2 enriched-like: both ER and PR-, HER2+
+      #Triple negative: ER, PR, HER2-
+      #Prepare z design matrix
+      z.design <- matrix(0,M,5)
+      #define Luminal-A like
+      idx.1 <- which((z.standard[,1]==1|z.standard[,2]==1)
+                     &z.standard[,3]==0
+                     &(z.standard[,4]==1|z.standard[,4]==2))
+      z.design[idx.1,1] <- 1
+      #define Luminal-B like
+      idx.2 <- which((z.standard[,1]==1|z.standard[,2]==1)
+                     &z.standard[,3]==1)
+      z.design[idx.2,2] <- 1
+      #for Luminal B HER2 negative-like
+      idx.3 <- which((z.standard[,1]==1|z.standard[,2]==1)
+                     &z.standard[,3]==0
+                     &z.standard[,4]==3)
+      z.design[idx.3,3] <- 1
+      #for HER2 enriched-like
+      idx.4 <- which(z.standard[,1]==0&z.standard[,2]==0
+                     &z.standard[,3]==1)
+      z.design[idx.4,4] <- 1
+      #for Triple negative
+      idx.5 <- which(z.standard[,1]==0&z.standard[,2]==0
+                     &z.standard[,3]==0)
+      z.design[idx.5,5] <- 1
       
-    }else
-    {
-      allcov=c(paste0("PC_",1:10),"age")
-    }
-    #add conditional snp
-    all(pheno$ID==colnames(condsnpdat))
-    pheno$condsnp=unlist(condsnpdat[1,])
-    allcov=c(allcov,"condsnp")
-    x.covar.mis1 =pheno[,allcov]
-    #x.covar.mis1 <- data1[,5:14]
-    
-    #################################
-    #this section is not important
-    #it's mainly used to convert the effect-size to minor allele
-    #no need for this in analyses
-    # idx.control <- which(y.pheno.mis1[,1]==0)
-    # maf <- sum(x.test.all.mis1[idx.control,i1])/(2*length(idx.control))
-    # if(maf>=0.5){
-    #   x.test.all.mis1[,i1] < 2 - x.test.all.mis1[,i1]
-    # }
-    #################################
-    
-    
-    # x.all.mis1 <- as.matrix(cbind(x.test.all.mis1[,i1],x.covar.mis1))
-    # colnames(x.all.mis1)[1] <- "gene"
-    
-    n.param <- ncol(z.design)
-    #output file
-    # outfile=paste0(outfolder,"/res_",i1,".RData")
-    # ilast=1
-    
-    gene_value = x.test.all.mis1[,1,drop = F]
-    #Fit the two-stage model
-    #Two stage have several z design matrix structure
-    #baseline only assume all subtypes have the same effect
-    #additive assumes all higher order interactions across to be 0
-    #pair-wise interaction allows main effect and second order interactions across tumor markers
-    #saturated model allows all interactions
-    #we can also self design the z matrix
-    #in this setting, we self define the z matrix to make the definition align with intrinsic subtypes
-    #we only do this self define z matrix for genetic variant
-    #meanwhile, we keep the additive model for all other covariates
-    #Sys.time()
-    Heter.result=tryCatch(
-      expr = {
-        EMmvpolySelfDesign(y.pheno.mis1,
-                           x.self.design = gene_value,
-                           z.design=z.design,
-                           baselineonly = NULL,
-                           additive = x.covar.mis1,
-                           pairwise.interaction = NULL,
-                           saturated = NULL,missingTumorIndicator = 888)
-      },
-      error = function(e){ 
-        return(NULL)
-      })
-    # Heter.result = EMmvpolySelfDesign(y.pheno.mis1,
-    #                                        x.self.design = gene_value,
-    #                                        z.design=z.design,
-    #                                        baselineonly = NULL,
-    #                                        additive = x.covar.mis1,
-    #                                        pairwise.interaction = NULL,
-    #                                        saturated = NULL,missingTumorIndicator = 888)
-    #Sys.time()
-    
-    #the log-odds ratio for second-stage parameters are saved in the first elelment
-    #first M parameters are for intercept
-    #We don't make any assumptions regarding the intercept
-    #Therefore, the intercept has the same degree of freedom panelty as the M subtypes
-    #The next five parameters are for the genetic variants
-    #They represent the log-odds ratio for the five intrinsic subtypes
-    if (!is.null(Heter.result))
-    {
-      log.odds <- Heter.result[[1]][(M+1):(M+n.param)]
-      log.odds=as.data.frame(t(log.odds))
-      rownames(log.odds)=rownames(genodat)[1]
-      #nparm <- length(Heter.result[[1]])  
-      #variance matrix for the log-odds-ratio are saved in the second component
-      sigma.log.odds <- Heter.result[[2]][(M+1):(M+n.param),(M+1):(M+n.param)]
-    }else
-    {
-      warning(paste0(rownames(genodat)[1]," notconverge"))
-    }
-    
-    #score test
-    score.test.support.ERPRHER2Grade <- ScoreTestSupport(
-      y.pheno.mis1,
-      baselineonly = NULL,
-      additive = x.covar.mis1,
-      pairwise.interaction = NULL,
-      saturated = NULL,
-      missingTumorIndicator = 888
-    )
-    
-    ##get the three different z design matrix
-    z.design.list = GenerateZDesignCombination(y.pheno.mis1)
-    z.additive = z.design.list[[1]]
-    z.interaction = z.design.list[[2]]
-    z.saturated = z.design.list[[3]]
-    #number of second stage parameters
-    #if use additive model
-    n.second = ncol(z.additive)
-    #if use pair-wise interaction model
-    #n.second = ncol(z.interaction)
-    #if use saturated model
-    #n.second = ncol(z.saturated)
-    
-    #number of subject in the genotype file is n
-    n=ncol(genodat)
-    #count the number of variants in the file
-    num=nrow(genodat)
-    all(pheno$ID==colnames(genodat))
-    idx.control <- which(y.pheno.mis1[,1]==0)
-    #count the number of control in the data
-    n.control <- length(idx.control)
-    
-    #output for each variant
-    freq.all=rep(NA,num)
-    names(freq.all)=rownames(genodat)
-    score_result=data.frame(matrix(NA,nrow=num,ncol=n.second))
-    infor_result=data.frame(matrix(NA,nrow=num,ncol=n.second^2))
-    rownames(score_result)=rownames(infor_result)=rownames(genodat)
-    
-    snpvalue = genodat[1,,drop = F]
-    snpvalue.control <- snpvalue[idx.control]
-    freq <- sum(snpvalue.control,na.rm=T)/(2*n.control)
-    freq.all[1] <- freq
-    if(freq<0.006|freq>0.994){
-      #if the SNP is too rare, just keep as score 0.
-      score_result[1,] <- 0
-      infor_result[1,] <- 0.1
-    }else
-    {
-      result=tryCatch(
+      #genotype data
+      x.test.all.mis1 <- t(genodat)
+      #prepare covariates table: PC1-10
+      #we only adjusted PC1-10 in known SNPs analyses
+      #in genome-wide analyses, we will need to adjust age and PC1-10
+      #need to add age
+      if ("pc1" %in% colnames(pheno)) #iCOGS
+      {
+        allcov=c(paste0("plinkPC",1:10),"age")
+        tmp=read.table("../result/imp_icogs/merged1.eigenvec")
+        colnames(tmp)=c("ID",paste0("plinkPC",1:20))
+        tmp1=unlist(strsplit(tmp$ID,"_"))
+        tmp$ID=tmp1[seq(1,length(tmp1),2)]
+        idx=match(pheno$ID,tmp$ID)
+        pheno=cbind(pheno,tmp[idx,2:11])
+        
+      }else
+      {
+        allcov=c(paste0("PC_",1:10),"age")
+      }
+      #add conditional snp
+      all(pheno$ID==colnames(condsnpdat))
+      ncondsnp=nrow(condsnpdat)
+      pheno=cbind(pheno,t(condsnpdat))
+      condsnpid1=rownames(condsnpdat)
+      allcov=c(allcov,condsnpid1)
+      x.covar.mis1 =pheno[,allcov]
+      #x.covar.mis1 <- data1[,5:14]
+      
+      #################################
+      #this section is not important
+      #it's mainly used to convert the effect-size to minor allele
+      #no need for this in analyses
+      # idx.control <- which(y.pheno.mis1[,1]==0)
+      # maf <- sum(x.test.all.mis1[idx.control,i1])/(2*length(idx.control))
+      # if(maf>=0.5){
+      #   x.test.all.mis1[,i1] < 2 - x.test.all.mis1[,i1]
+      # }
+      #################################
+      
+      
+      # x.all.mis1 <- as.matrix(cbind(x.test.all.mis1[,i1],x.covar.mis1))
+      # colnames(x.all.mis1)[1] <- "gene"
+      
+      n.param <- ncol(z.design)
+      #output file
+      # outfile=paste0(outfolder,"/res_",i1,".RData")
+      # ilast=1
+      
+      gene_value = x.test.all.mis1[,1,drop = F]
+      #Fit the two-stage model
+      #Two stage have several z design matrix structure
+      #baseline only assume all subtypes have the same effect
+      #additive assumes all higher order interactions across to be 0
+      #pair-wise interaction allows main effect and second order interactions across tumor markers
+      #saturated model allows all interactions
+      #we can also self design the z matrix
+      #in this setting, we self define the z matrix to make the definition align with intrinsic subtypes
+      #we only do this self define z matrix for genetic variant
+      #meanwhile, we keep the additive model for all other covariates
+      #Sys.time()
+      Heter.result=tryCatch(
         expr = {
-          score.test<- ScoreTest(y=y.pheno.mis1,
-                                 x=unlist(snpvalue),
-                                 second.stage.structure="additive",
-                                 score.test.support=score.test.support.ERPRHER2Grade,
-                                 missingTumorIndicator=888)
+          EMmvpolySelfDesign(y.pheno.mis1,
+                             x.self.design = gene_value,
+                             z.design=z.design,
+                             baselineonly = NULL,
+                             additive = x.covar.mis1,
+                             pairwise.interaction = NULL,
+                             saturated = NULL,missingTumorIndicator = 888)
         },
         error = function(e){ 
           return(NULL)
         })
+      # Heter.result = EMmvpolySelfDesign(y.pheno.mis1,
+      #                                        x.self.design = gene_value,
+      #                                        z.design=z.design,
+      #                                        baselineonly = NULL,
+      #                                        additive = x.covar.mis1,
+      #                                        pairwise.interaction = NULL,
+      #                                        saturated = NULL,missingTumorIndicator = 888)
+      #Sys.time()
       
-      if (!is.null(result))
+      #the log-odds ratio for second-stage parameters are saved in the first elelment
+      #first M parameters are for intercept
+      #We don't make any assumptions regarding the intercept
+      #Therefore, the intercept has the same degree of freedom panelty as the M subtypes
+      #The next five parameters are for the genetic variants
+      #They represent the log-odds ratio for the five intrinsic subtypes
+      if (!is.null(Heter.result))
       {
-        #the first element is score
-        score_result[1,]  <- result[[1]]
-        #the second element is the efficient information matrix
-        infor_result[1,] <- as.vector(result[[2]])
+        log.odds <- Heter.result[[1]][(M+1):(M+n.param)]
+        log.odds=as.data.frame(t(log.odds))
+        rownames(log.odds)=rownames(genodat)[1]
+        #nparm <- length(Heter.result[[1]])  
+        #variance matrix for the log-odds-ratio are saved in the second component
+        sigma.log.odds <- Heter.result[[2]][(M+1):(M+n.param),(M+1):(M+n.param)]
       }else
       {
-        warning(paste0(rownames(genodat)[1]," don't converge"))
+        warning(paste0(rownames(genodat)[1]," notconverge"))
       }
+      
+      #score test
+      score.test.support.ERPRHER2Grade <- ScoreTestSupport(
+        y.pheno.mis1,
+        baselineonly = NULL,
+        additive = x.covar.mis1,
+        pairwise.interaction = NULL,
+        saturated = NULL,
+        missingTumorIndicator = 888
+      )
+      
+      ##get the three different z design matrix
+      z.design.list = GenerateZDesignCombination(y.pheno.mis1)
+      z.additive = z.design.list[[1]]
+      z.interaction = z.design.list[[2]]
+      z.saturated = z.design.list[[3]]
+      #number of second stage parameters
+      #if use additive model
+      n.second = ncol(z.additive)
+      #if use pair-wise interaction model
+      #n.second = ncol(z.interaction)
+      #if use saturated model
+      #n.second = ncol(z.saturated)
+      
+      #number of subject in the genotype file is n
+      n=ncol(genodat)
+      #count the number of variants in the file
+      num=nrow(genodat)
+      all(pheno$ID==colnames(genodat))
+      idx.control <- which(y.pheno.mis1[,1]==0)
+      #count the number of control in the data
+      n.control <- length(idx.control)
+      
+      #output for each variant
+      freq.all=rep(NA,num)
+      names(freq.all)=rownames(genodat)
+      score_result=data.frame(matrix(NA,nrow=num,ncol=n.second))
+      infor_result=data.frame(matrix(NA,nrow=num,ncol=n.second^2))
+      rownames(score_result)=rownames(infor_result)=rownames(genodat)
+      
+      snpvalue = genodat[1,,drop = F]
+      snpvalue.control <- snpvalue[idx.control]
+      freq <- sum(snpvalue.control,na.rm=T)/(2*n.control)
+      freq.all[1] <- freq
+      if(freq<0.006|freq>0.994){
+        #if the SNP is too rare, just keep as score 0.
+        score_result[1,] <- 0
+        infor_result[1,] <- 0
+      }else
+      {
+        result=tryCatch(
+          expr = {
+            score.test<- ScoreTest(y=y.pheno.mis1,
+                                   x=unlist(snpvalue),
+                                   second.stage.structure="additive",
+                                   score.test.support=score.test.support.ERPRHER2Grade,
+                                   missingTumorIndicator=888)
+          },
+          error = function(e){ 
+            return(NULL)
+          })
+        
+        if (!is.null(result))
+        {
+          #the first element is score
+          score_result[1,]  <- result[[1]]
+          #the second element is the efficient information matrix
+          infor_result[1,] <- as.vector(result[[2]])
+        }else
+        {
+          warning(paste0(rownames(genodat)[1]," don't converge"))
+        }
+      }
+      return(list(log.odds=log.odds,sigma.log.odds=sigma.log.odds,score_result=score_result,infor_result=infor_result))
+      
+    }else
+    {
+      return(NULL)
     }
-  
-  return(list(log.odds=log.odds,sigma.log.odds=sigma.log.odds,score_result=score_result,infor_result=infor_result))
-    
+ 
   }else
   {
     return(NULL)
   }
   
-  }
+}
 LogoddsMetaAnalysis <- function(logoddslist,sigmalist){
   if (length(logoddslist)>1)
   {
@@ -573,15 +583,15 @@ print(Sys.time())
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.swarm -g 32 --module R/4.3 --time=4-00:00:00 --gres=lscratch:32
 
 #read results
-allres=NULL
-for(i in 1:11)
-{
-  outfile=paste0("../result/conditional_result",i,".txt")
-  tmp=read.table(outfile,header=T)
-  allres=rbind(allres,tmp)
-}
-idx=match(allres$snp,allnovelsnps1$ID)
-allres$freq=allnovelsnps1$freq[idx]
+# allres=NULL
+# for(i in 1:11)
+# {
+#   outfile=paste0("../result/conditional_result",i,".txt")
+#   tmp=read.table(outfile,header=T)
+#   allres=rbind(allres,tmp)
+# }
+# idx=match(allres$snp,allnovelsnps1$ID)
+# allres$freq=allnovelsnps1$freq[idx]
 # table(allres$acatP<1e-6)
 # FALSE  TRUE 
 # 4     7 

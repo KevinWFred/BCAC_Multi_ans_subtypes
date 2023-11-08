@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 #aggregate logodds and sigma across populations
+#get the final global test p-values (ACAT p-values)
 .libPaths(c("/data/wangx53",.libPaths()))
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 library(data.table)
@@ -203,7 +204,8 @@ idx=complete.cases(allpvalues)
 allpvalues=allpvalues[idx,]
 allpvalues=ACAT(t(allpvalues))
 names(allpvalues)=tmp[idx]
-save(intrinsicpvalues,scoretestallpvaues,allpvalues,file="../result/compute_metapvalues.RData")
+#new scoretestallpvaues (MAF>0.006)-->allpvalues
+save(intrinsicpvalues,scoretestallpvaues,allpvalues,file="../result/compute_metapvalues_new.RData")
 #check novel variants:
 library(GenomicRanges)
 knownvar=read.csv("../data/218_known_discovery_snp_paper_order_101323.csv")
@@ -227,10 +229,10 @@ gr_knownvar1=GRanges(seqnames = knownvar$CHR,ranges=IRanges(start=knownvar$hg38p
 #dist=distance(gr_allpvalues,gr_knownvar)
 neardist=distanceToNearest(gr_allpvalues,gr_knownvar)
 neardist1=distanceToNearest(gr_allpvalues,gr_knownvar1)
-sum(neardist@elementMetadata@listData$distance==0) #1504409
+sum(neardist@elementMetadata@listData$distance==0) #1504407
 idx=which(neardist@elementMetadata@listData$distance!=0)
 novelpvalues=allpvalues[idx]
-sum(novelpvalues<5e-8) #628
+sum(novelpvalues<5e-8) #627
 idx1=which(novelpvalues<5e-8)
 tmp=data.frame(snp=names(novelpvalues[idx1]),p=novelpvalues[idx1])
 write.table(tmp,file="../result/novelpvalues.txt",row.names = F,sep="\t",quote=F)
@@ -256,7 +258,7 @@ while (min(novelpvaules1)<5e-8 & n<length(novelpvaules1))
   if(length(idx1)>0) novelpvaules1[c(idx1)]=1
   n=n+1
 }
-length(independentnovelvar) #31
+length(independentnovelvar) #30
 tmp=data.frame(snp=names(independentnovelvar),p=independentnovelvar)
 
 tmp=data.frame(snp=names(independentnovelvar))
@@ -284,7 +286,7 @@ tmp=as.data.frame(fread("../result/onco_control_independentnovelsnp.bim"))
 onco_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1.pvar"))
 table(names(independentnovelvar) %in% onco_pvar$ID)
 # FALSE  TRUE 
-# 7    24 
+# 7    23 
 oncomissing=names(independentnovelvar)[!names(independentnovelvar) %in% onco_pvar$ID]
 
 pthr=1
@@ -297,14 +299,14 @@ cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp"," --clump
            pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/onco_independentnovel")
 
 system(cmd)
-#24 --> 24
+#23 --> 23
 onco_clumping=read.table("../result/onco_independentnovel.clumped",header=T)
 
 
 icogs_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.pvar"))
 table(names(independentnovelvar) %in% icogs_pvar$ID)
 # FALSE  TRUE 
-# 1    33
+# 1    29
 table(oncomissing %in% icogs_pvar$ID)
 pheno_icogs=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concept_750_zhang_icogs_pheno_v15_02.txt",header=T,sep="\t")
 fam_icogs=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.psam")
@@ -330,7 +332,7 @@ icogs_independentnovel=read.table("../result/icogs_control_independentnovelsnp.b
 names(independentnovelvar)[!names(independentnovelvar) %in% icogs_independentnovel$V2]
 #chr6:52468337:G:A
 #30 --> 30
-#total is 31 (30+1)
+#total is 30 (29+1)
 icogs_clumping=read.table("../result/icogs_independentnovel.clumped",header=T)
 allnovelsnps=c("chr6:52468337:G:A",icogs_clumping$SNP)
 allnovelsnps=data.frame(ID=allnovelsnps,chr=NA,pos=NA,rsid=NA,pvalue=NA)
@@ -382,45 +384,24 @@ for (i in 1:nrow(allnovelsnps))
     allnovelsnps$hg19pos[i]=tmp$start[1]
   }
 }
-
-write.csv(allnovelsnps,file="../result/allnovelsnps.csv",row.names = F,quote=F)
-allnovelsnps=read.csv("../result/allnovelsnps.csv")
 idx=match(allnovelsnps$ID,names(metascoreinfo4$freq))
 allnovelsnps$freq=metascoreinfo4$freq[idx]
+write.csv(allnovelsnps,file="../result/allnovelsnps.csv",row.names = F,quote=F)
+allnovelsnps=read.csv("../result/allnovelsnps.csv")
+
 gr_allnovelsnps=GRanges(seqnames = allnovelsnps$chr,ranges = IRanges(start=allnovelsnps$pos,width=1))
 tmp=distanceToNearest(gr_allnovelsnps,gr_knownvar1)
 allnovelsnps$dist2nearestknown=tmp@elementMetadata@listData$distance
 all(knownvar$hg38position==start(gr_knownvar1))
 table(allnovelsnps$dist2nearestknown<2e6)
 # FALSE  TRUE 
-# 20    11
+# 20    10
 quantile(allnovelsnps$dist2nearestknown)
 # 0%      25%      50%      75%     100% 
-# 550583  1301256  2594205  6411379 28452496 
-#for those within 2MB of known variants, find the closest knownvar
+# 550583  1403882  2769633  6586420 28452496
+#for those within 2MB of known variants, find the knownvar in +-2MB
 allnovelsnps1=allnovelsnps[allnovelsnps$dist2nearestknown<2e6,]
-table(allnovelsnps1$freq<0.006)
-# FALSE  TRUE 
-# 7     4
-#these knownvar should appear in all datasets
-pvar_euro_icogs=as.data.frame(fread("../result/imp_icogs/euro/euro.pvar"))
-gr_pvar_euro_icogs=GRanges(seqnames = pvar_euro_icogs$`#CHROM`,ranges=IRanges(start=pvar_euro_icogs$POS,width=1))
-pvar_euro_onco=as.data.frame(fread("../result/imp_onco/euro/euro.pvar"))
-gr_pvar_euro_onco=GRanges(seqnames = pvar_euro_onco$`#CHROM`,ranges=IRanges(start=pvar_euro_onco$POS,width=1))
-pvar_asian_icogs=as.data.frame(fread("../result/imp_icogs/asian/asian.pvar"))
-gr_pvar_asian_icogs=GRanges(seqnames = pvar_asian_icogs$`#CHROM`,ranges=IRanges(start=pvar_asian_icogs$POS,width=1))
-pvar_asian_onco=as.data.frame(fread("../result/imp_onco/asian/asian.pvar"))
-gr_pvar_asian_onco=GRanges(seqnames = pvar_asian_onco$`#CHROM`,ranges=IRanges(start=pvar_asian_onco$POS,width=1))
-pvar_african_onco=as.data.frame(fread("../result/imp_onco/african/african.pvar"))
-gr_pvar_african_onco=GRanges(seqnames = pvar_african_onco$`#CHROM`,ranges=IRanges(start=pvar_african_onco$POS,width=1))
-tmp=intersect(gr_pvar_euro_icogs,gr_pvar_euro_onco)
-tmp=intersect(tmp,gr_pvar_asian_icogs)
-tmp=intersect(tmp,gr_pvar_asian_onco)
-tmp=intersect(tmp,gr_pvar_african_onco)
-tmp1=distanceToNearest(gr_knownvar1,tmp)
-idx=which(tmp1@elementMetadata@listData$distance==0)
-knownvar2=knownvar[idx,]
-gr_knownvar2=GRanges(seqnames = knownvar2$CHR,ranges=IRanges(knownvar2$hg38position,width=1))
+
 allnovelsnps1$knownvar_rsid=allnovelsnps1$knownvar=allnovelsnps1$dist2nearestknown1=NA
 allnovelsnps1$knownvar_pvalue=NA
 gr_allnovelsnps1=GRanges(seqnames = allnovelsnps1$chr,ranges=IRanges(start=allnovelsnps1$pos,width=1))
@@ -439,19 +420,22 @@ gr_allnovelsnps1=GRanges(seqnames = allnovelsnps1$chr,ranges=IRanges(start=allno
 #     allnovelsnps1$dist2nearestknown1[i]=tmp3
 #   }
 # }
+gr_knownvar2=intersect(gr_knownvar1,gr_allpvalues)
+idx=match(gr_knownvar2,gr_knownvar1)
+knownvar2=knownvar[idx,]
 for(i in 1:nrow(allnovelsnps1))
 {
   tmp1=distance(gr_knownvar2,gr_allnovelsnps1[i])
-  idx=which.min(tmp1)
-  tmp2=distance(gr_knownvar2[idx],gr_allpvalues)
-  idx1=which(tmp2==0)
+  idx=which(tmp1<2e6)
+  tmp2=distanceToNearest(gr_knownvar2[idx],gr_allpvalues)
+  idx1=tmp2@to[which(tmp2@elementMetadata$distance==0)]
   if (length(idx1)>0)
   {
-    allnovelsnps1$knownvar_rsid[i]=knownvar2$Best.published.SNP[idx]
-    allnovelsnps1$knownvar[i]=names(allpvalues)[idx1]
-    allnovelsnps1$knownvar_pvalue[i]=allpvalues[idx1]
+    allnovelsnps1$knownvar_rsid[i]=paste0(knownvar2$Best.published.SNP[idx],collapse = ",")
+    allnovelsnps1$knownvar[i]=paste0(names(allpvalues)[idx1],collapse = ",")
+    allnovelsnps1$knownvar_pvalue[i]=paste0(allpvalues[idx1],collapse = ",")
     tmp3=distance(gr_allnovelsnps1[i],gr_allpvalues[idx1])
-    allnovelsnps1$dist2nearestknown1[i]=tmp3
+    allnovelsnps1$dist2nearestknown1[i]=paste0(tmp3,collapse = ",")
   }
 }
 #all the closest knowvar can be found in the result
