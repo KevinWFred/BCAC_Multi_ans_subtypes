@@ -399,6 +399,8 @@ table(allnovelsnps$dist2nearestknown<2e6)
 quantile(allnovelsnps$dist2nearestknown)
 # 0%      25%      50%      75%     100% 
 # 550583  1403882  2769633  6586420 28452496
+allnovelsnps0=allnovelsnps[allnovelsnps$dist2nearestknown>2e6,]
+write.table(allnovelsnps0,file="../result/allnovelsnps0.txt",row.names = F,sep="\t",quote=F)
 #for those within 2MB of known variants, find the knownvar in +-2MB
 allnovelsnps1=allnovelsnps[allnovelsnps$dist2nearestknown<2e6,]
 

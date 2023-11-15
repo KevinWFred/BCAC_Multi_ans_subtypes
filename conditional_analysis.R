@@ -583,15 +583,19 @@ print(Sys.time())
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.swarm -g 32 --module R/4.3 --time=4-00:00:00 --gres=lscratch:32
 
 #read results
-# allres=NULL
-# for(i in 1:11)
-# {
-#   outfile=paste0("../result/conditional_result",i,".txt")
-#   tmp=read.table(outfile,header=T)
-#   allres=rbind(allres,tmp)
-# }
-# idx=match(allres$snp,allnovelsnps1$ID)
-# allres$freq=allnovelsnps1$freq[idx]
-# table(allres$acatP<1e-6)
+allres=NULL
+for(i in 1:10)
+{
+  outfile=paste0("../result/conditional_result",i,".txt")
+  tmp=read.table(outfile,header=T)
+  allres=rbind(allres,tmp)
+}
+idx=match(allres$snp,allnovelsnps1$ID)
+allres$freq=allnovelsnps1$freq[idx]
+table(allres$acatP<1e-6)
 # FALSE  TRUE 
-# 4     7 
+# 4     6
+allres1=allnovelsnps1[,c("ID","rsid","dist2nearestknown1","knownvar_rsid")]
+idx=match(allres1$ID,allres$snp)
+allres1=cbind(allres1,allres[idx,2:4])
+write.csv(allres1,file="../result/conditional_analysis_res.csv",row.names = F,quote=T)
