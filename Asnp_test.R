@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-#run conditional analysis on 11 novel snps 
+#run global test on novel snps 
 
 .libPaths(c("/data/wangx53",.libPaths()))
 library(readr)
@@ -130,20 +130,18 @@ EMmvpolySelfDesign=function (y, x.self.design, z.design, baselineonly = NULL, ad
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 print(paste0("host:",as.character(Sys.info()["nodename"])))
 set.seed(123)
-allnovelsnps1=read.table("../result/allnovelsnps1.txt",header=T)
-
+#allnovelsnps1=read.table("../result/allnovelsnps1.txt",header=T)
+allnovelsnps=read.csv("../result/allnovelsnps.csv")
+allnovelsnps$rsid[which(allnovelsnps$ID=="chr15:75637959:ATAATAAG:A")]="rs59356490"
+allnovelsnps$rsid[which(allnovelsnps$ID=="chr5:45368713:A:ATT")]="rs3028840"
 twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
 {
-  log.odds=sigma.log.odds=score_result=infor_result=NULL
+  log.odds=sigma.log.odds=score_result=infor_result=freq=NULL
   #intrinsic_subtypes 
-  snpid=allnovelsnps1$ID[i1]
-  condsnpid=allnovelsnps1$knownvar[i1]
-  condsnpid=unlist(strsplit(condsnpid,","))
-  condsnpid=c(snpid,condsnpid)
-  condsnpfile=paste0("../result/tmp/",snpid,".txt")
-  write.table(condsnpid,file=condsnpfile,row.names = F,col.names = F,quote=F)
+  snpid=allnovelsnps$ID[i1]
+  
   if (file.exists(paste0("../result/tmp/",snpid,".traw"))) file.remove(paste0("../result/tmp/",snpid,".traw"))
-  cmd=paste0(plink2," --pfile ../result/imp_",dataopt,"/",pop,"/",pop," --extract ",condsnpfile," --memory 16000 --threads 1 --recode A-transpose --out ../result/tmp/",snpid)
+  cmd=paste0(plink2," --pfile ../result/imp_",dataopt,"/",pop,"/",pop," --snp ",snpid," --memory 16000 --threads 1 --recode A-transpose --out ../result/tmp/",snpid)
   system(cmd)
   if (file.exists(paste0("../result/tmp/",snpid,".traw")))
   {
@@ -189,10 +187,8 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
     #make pheno and genodat consistent in sample orders
     idx=match(allsamples,colnames(genodat))
     genodat=genodat[,idx]
-    idx=rownames(genodat)==snpid
-    condsnpdat=genodat[!idx,]
-    genodat=genodat[idx,]
-    if (sum(idx)>0 & sum(!idx)>0)
+    
+    if (sum(idx)>0)
     {
       pheno=pheno[match(allsamples,pheno$ID),]
       data1=pheno
@@ -268,12 +264,7 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
       {
         allcov=c(paste0("PC_",1:10),"age")
       }
-      #add conditional snp
-      all(pheno$ID==colnames(condsnpdat))
-      ncondsnp=nrow(condsnpdat)
-      pheno=cbind(pheno,t(condsnpdat))
-      condsnpid1=rownames(condsnpdat)
-      allcov=c(allcov,condsnpid1)
+      
       x.covar.mis1 =pheno[,allcov]
       #x.covar.mis1 <- data1[,5:14]
       
@@ -383,8 +374,6 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
       n.control <- length(idx.control)
       
       #output for each variant
-      freq.all=rep(NA,num)
-      names(freq.all)=rownames(genodat)
       score_result=data.frame(matrix(NA,nrow=num,ncol=n.second))
       infor_result=data.frame(matrix(NA,nrow=num,ncol=n.second^2))
       rownames(score_result)=rownames(infor_result)=rownames(genodat)
@@ -392,7 +381,6 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
       snpvalue = genodat[1,,drop = F]
       snpvalue.control <- snpvalue[idx.control]
       freq <- sum(snpvalue.control,na.rm=T)/(2*n.control)
-      freq.all[1] <- freq
       if(freq<0.006|freq>0.994){
         #if the SNP is too rare, just keep as score 0.
         score_result[1,] <- 0
@@ -422,7 +410,7 @@ twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
           warning(paste0(rownames(genodat)[1]," don't converge"))
         }
       }
-      return(list(log.odds=log.odds,sigma.log.odds=sigma.log.odds,score_result=score_result,infor_result=infor_result))
+      return(list(log.odds=log.odds,sigma.log.odds=sigma.log.odds,score_result=score_result,infor_result=infor_result,freq=freq))
       
     }else
     {
@@ -479,12 +467,11 @@ ScoreMetaAnalysis <- function(score=score.meta,infor=infor.meta,second.num=5){
 
 args <- commandArgs(trailingOnly=T)
 i1=as.numeric(args[1])
-res=data.frame(snp=allnovelsnps1$ID[i1],scoreP=NA,intrinsicP=NA,acatP=NA,euro_icogs_intr=NA,euro_onco_intr=NA,asian_icogs_intr=NA,asian_onco_intr=NA,african_onco_intr=NA,
-               euro_icogs_score=NA,euro_onco_score=NA,asian_icogs_score=NA,asian_onco_score=NA,african_onco_score=NA)
-outfile=paste0("../result/conditional_result",i1,".txt")
-#this is the result to remove the conditional snp: #allcov=c(allcov,"condsnp")
-#outfile=paste0("../result/noconditional_result",i1,".txt")
-#for (i1 in 1:nrow(allnovelsnps1))
+res=data.frame(snp=allnovelsnps$ID[i1],scoreP=NA,intrinsicP=NA,acatP=NA,euro_icogs_intr=NA,euro_onco_intr=NA,asian_icogs_intr=NA,asian_onco_intr=NA,african_onco_intr=NA,
+               euro_icogs_score=NA,euro_onco_score=NA,asian_icogs_score=NA,asian_onco_score=NA,african_onco_score=NA,
+               euro_icogs_freq=NA,euro_onco_freq=NA,asian_icogs_freq=NA,asian_onco_freq=NA,african_onco_freq=NA)
+outfile=paste0("../result/Novelsnp_test_result",i1,".txt")
+#for (i1 in 1:nrow(allnovelsnps))
 #{
   print(i1)
   twotests_euro_icogs=twotests_fun(dataopt="icogs",pop="euro",i1=i1)
@@ -498,6 +485,7 @@ outfile=paste0("../result/conditional_result",i1,".txt")
   infor.meta=data.frame(matrix(0,nrow=1,ncol=25))
   if (!is.null(twotests_euro_icogs))
   {
+    res$euro_icogs_freq=twotests_euro_icogs$freq
     if (!is.null(twotests_euro_icogs$log.odds))
     {
       logoddslist=c(logoddslist,list(twotests_euro_icogs$log.odds))
@@ -512,6 +500,7 @@ outfile=paste0("../result/conditional_result",i1,".txt")
   }
   if (!is.null(twotests_euro_onco))
   {
+    res$euro_onco_freq=twotests_euro_onco$freq
     if (!is.null(twotests_euro_onco$log.odds))
     {
       logoddslist=c(logoddslist,list(twotests_euro_onco$log.odds))
@@ -526,6 +515,7 @@ outfile=paste0("../result/conditional_result",i1,".txt")
   }
   if (!is.null(twotests_asian_icogs))
   {
+    res$asian_icogs_freq=twotests_asian_icogs$freq
     if (!is.null(twotests_asian_icogs$log.odds))
     {
       logoddslist=c(logoddslist,list(twotests_asian_icogs$log.odds))
@@ -540,6 +530,7 @@ outfile=paste0("../result/conditional_result",i1,".txt")
   }
   if (!is.null(twotests_asian_onco))
   {
+    res$asian_onco_freq=twotests_asian_onco$freq
     if (!is.null(twotests_asian_onco$log.odds))
     {
       logoddslist=c(logoddslist,list(twotests_asian_onco$log.odds))
@@ -554,6 +545,7 @@ outfile=paste0("../result/conditional_result",i1,".txt")
   }
   if (!is.null(twotests_african_onco))
   {
+    res$african_onco_freq=twotests_african_onco$freq
     if (!is.null(twotests_african_onco$log.odds))
     {
       logoddslist=c(logoddslist,list(twotests_african_onco$log.odds))
@@ -577,25 +569,100 @@ outfile=paste0("../result/conditional_result",i1,".txt")
 
 write.table(res,file=outfile,row.names=F,sep="\t",quote=F)
 print(Sys.time())
-# tmp=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.R",i1=1:nrow(allnovelsnps1))
-# write.table(tmp,file="conditional_analysis.swarm",row.names = F,col.names = F,sep=" ",quote=F)
-#11909056,11909662
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.swarm -g 32 --module R/4.3 --time=04:00:00 --gres=lscratch:32
+# tmp=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/Asnp_test.R",i1=1:nrow(allnovelsnps))
+# write.table(tmp,file="Asnp_test.swarm",row.names = F,col.names = F,sep=" ",quote=F)
+#
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/Asnp_test.swarm -g 32 --module R/4.3 --time=4:00:00 --gres=lscratch:32
 
-#read results
+# #read results
 allres=NULL
-for(i in 1:nrow(allnovelsnps1))
+for(i in 1:nrow(allnovelsnps))
 {
-  outfile=paste0("../result/conditional_result",i,".txt")
+  outfile=paste0("../result/Novelsnp_test_result",i,".txt")
   tmp=read.table(outfile,header=T)
   allres=rbind(allres,tmp)
 }
-idx=match(allres$snp,allnovelsnps1$ID)
-allres$freq=allnovelsnps1$freq[idx]
-table(allres$acatP<1e-6)
-# FALSE  TRUE
-# 2     4
-allres1=allnovelsnps1[,c("ID","rsid","dist2nearestknown1","knownvar_rsid")]
-idx=match(allres1$ID,allres$snp)
-allres1=cbind(allres1,allres[idx,2:4])
-write.csv(allres1,file="../result/conditional_analysis_res.csv",row.names = F,quote=T)
+all(allres$snp==allnovelsnps$ID)
+allres$rsid=allnovelsnps$rsid
+load("../result/compute_metapvalues_population.RData")
+allres1=data.frame(ID=allres$snp,chr=allnovelsnps$chr,pos=allnovelsnps$pos,rsid=allnovelsnps$rsid,MAF_EUR=NA,MAF_EAS=NA,MAF_AFR=NA,
+                   P=NA,P_EUR=NA,P_EAS=NA,P_AFR=NA)
+for (i in 1:nrow(allres1))
+{
+  idx=which(names(collect_pvalues_euro$acatpvalues)==allres1$ID[i])
+  if (length(idx)>0)
+  {
+    allres1$P_EUR[i]=collect_pvalues_euro$acatpvalues[idx]
+  }
+  idx=which(names(collect_pvalues_asian$acatpvalues)==allres1$ID[i])
+  if (length(idx)>0)
+  {
+    allres1$P_EAS[i]=collect_pvalues_asian$acatpvalues[idx]
+  }
+  idx=which(names(collect_pvalues_african$acatpvalues)==allres1$ID[i])
+  if (length(idx)>0)
+  {
+    allres1$P_AFR[i]=collect_pvalues_african$acatpvalues[idx]
+  }
+}
+idx=which(!is.na(allres$euro_icogs_freq))
+allres1$MAF_EUR[idx]=allres$euro_icogs_freq[idx]
+idx=which(!is.na(allres$euro_onco_freq))
+allres1$MAF_EUR[idx]=allres$euro_onco_freq[idx]
+
+idx=which(!is.na(allres$asian_icogs_freq))
+allres1$MAF_EAS[idx]=allres$asian_icogs_freq[idx]
+idx=which(!is.na(allres$asian_onco_freq))
+allres1$MAF_EAS[idx]=allres$asian_onco_freq[idx]
+
+idx=which(!is.na(allres$african_onco_freq))
+allres1$MAF_AFR[idx]=allres$african_onco_freq[idx]
+allres1$P=allres$acatP
+
+idx=which(allres1$MAF_EUR>0.5)
+allres1$MAF_EUR[idx]=1-allres1$MAF_EUR[idx]
+
+idx=which(allres1$MAF_EAS>0.5)
+allres1$MAF_EAS[idx]=1-allres1$MAF_EAS[idx]
+
+idx=which(allres1$MAF_AFR>0.5)
+allres1$MAF_AFR[idx]=1-allres1$MAF_AFR[idx]
+
+conditionres=read.csv("../result/conditional_analysis_res.csv")
+rmsnp=conditionres$ID[which(conditionres$acatP>1e-6)]
+allres1=allres1[!allres1$ID %in% rmsnp,]
+allres2=allres1
+idx=match(allres2$ID,allnovelsnps$ID)
+allres2$hg19pos=allnovelsnps$hg19pos[idx]
+eurexistingtable=as.data.frame(fread("/data/BB_Bioinformatics/RQ/Dataset/bc_summary_gwas.txt"))
+dim(eurexistingtable)
+# [1] 10760767       47
+tmp1=paste0(allres2$chr,":",allres2$hg19pos)
+tmp2=paste0(eurexistingtable$chr.iCOGs,":",eurexistingtable$Position.iCOGs)
+sum(tmp1 %in% tmp2) #12
+sum(tmp2 %in% tmp1) #12
+idx=match(tmp1,tmp2)
+allres1$EUR_existingP=eurexistingtable$p.meta[idx]
+easexistingtable=as.data.frame(fread("../data/all.meta.icogs.oncoarray.asian.overall.Apr2016.1.txt.gz"))
+dim(easexistingtable)
+# [1] 10884844       11
+tmp=unlist(strsplit(easexistingtable$MarkerName,"_"))
+tmp1=tmp[seq(1,length(tmp),4)]
+tmp2=tmp[seq(2,length(tmp),4)]
+tmp2=paste0(tmp1,":",tmp2)
+tmp1=paste0(allres2$chr,":",allres2$hg19pos)
+sum(tmp1 %in% tmp2) #9
+sum(tmp2 %in% tmp1) #9
+idx=match(tmp1,tmp2)
+allres1$EAS_existingP=easexistingtable$`P-value`[idx]
+afrexistingtable=as.data.frame(fread("unzip -p ../data/bcac_icogs_onco_african_meta_1kg_p3.zip",header=T,sep="\t"))
+tmp=unlist(strsplit(afrexistingtable$MarkerName,"_"))
+tmp1=tmp[seq(1,length(tmp),4)]
+tmp2=tmp[seq(2,length(tmp),4)]
+tmp2=paste0(tmp1,":",tmp2)
+tmp1=paste0(allres2$chr,":",allres2$hg19pos)
+sum(tmp1 %in% tmp2) #7
+sum(tmp2 %in% tmp1) #7
+idx=match(tmp1,tmp2)
+allres1$AFR_existingP=afrexistingtable$`P-value`[idx]
+write.csv(allres1,file="../result/allcandidatenovelsnps.csv",row.names = F)

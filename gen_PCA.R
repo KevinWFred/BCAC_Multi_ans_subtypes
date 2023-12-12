@@ -15,6 +15,8 @@ tmp1=unlist(strsplit(rownames(tmp),":"))
 tmp1=unlist(strsplit(tmp1,"_"))
 rownames(tmp)=tmp1[seq(1,length(tmp1),4)]
 
+bcacpca=flashpca("/data/DCEGLeiSongData/Kevin/tmp/BCAC_pruned", ndim=10,verbose = T)
+save(oncopca,icogspca,bcacpca,file="../result/gen_PCA.RData")
 
 
          

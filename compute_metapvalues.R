@@ -1,7 +1,11 @@
 #!/usr/bin/env Rscript
+#get the p-values of global test
 #aggregate logodds and sigma across populations
 #get the final global test p-values (ACAT p-values)
 .libPaths(c("/data/wangx53",.libPaths()))
+plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
+plink2="/usr/local/apps/plink/2.3-alpha/plink2"
+
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 library(data.table)
 library(bc2)
@@ -103,8 +107,6 @@ GlobalTestForAssoc <- function(logodds,sigma){
     ###format the output with three digits in total
     p.value.GTA <- round(p.value.GTA*10^power.number)/(10^power.number)
   }
-  
-  
   return(p.value.GTA)
 }
 
@@ -206,6 +208,18 @@ allpvalues=ACAT(t(allpvalues))
 names(allpvalues)=tmp[idx]
 #new scoretestallpvaues (MAF>0.006)-->allpvalues
 save(intrinsicpvalues,scoretestallpvaues,allpvalues,file="../result/compute_metapvalues_new.RData")
+quantile(allpvalues)
+# 0%           25%           50%           75%          100% 
+# 3.304934e-301  2.244364e-01  4.854851e-01  7.500808e-01  1.000000e+00
+load("../result/metascoreinfo4_new.RData")
+#pick snps with maxfreq>0.01
+table(names(allpvalues) %in% names(metascoreinfo4$maxfreq[metascoreinfo4$maxfreq>0.01]))
+# FALSE     TRUE 
+# 3966388 17386119
+allpvalues=allpvalues[names(allpvalues) %in% names(metascoreinfo4$maxfreq[metascoreinfo4$maxfreq>0.01])]
+quantile(allpvalues)
+# 0%           25%           50%           75%          100% 
+# 3.304934e-301  2.172723e-01  4.759848e-01  7.441142e-01  1.000000e+00 
 #check novel variants:
 library(GenomicRanges)
 knownvar=read.csv("../data/218_known_discovery_snp_paper_order_101323.csv")
@@ -229,10 +243,10 @@ gr_knownvar1=GRanges(seqnames = knownvar$CHR,ranges=IRanges(start=knownvar$hg38p
 #dist=distance(gr_allpvalues,gr_knownvar)
 neardist=distanceToNearest(gr_allpvalues,gr_knownvar)
 neardist1=distanceToNearest(gr_allpvalues,gr_knownvar1)
-sum(neardist@elementMetadata@listData$distance==0) #1504407
+sum(neardist@elementMetadata@listData$distance==0) #1221665
 idx=which(neardist@elementMetadata@listData$distance!=0)
 novelpvalues=allpvalues[idx]
-sum(novelpvalues<5e-8) #627
+sum(novelpvalues<5e-8) #579
 idx1=which(novelpvalues<5e-8)
 tmp=data.frame(snp=names(novelpvalues[idx1]),p=novelpvalues[idx1])
 write.table(tmp,file="../result/novelpvalues.txt",row.names = F,sep="\t",quote=F)
@@ -241,32 +255,7 @@ write.table(tmp,file="../result/novelsnp.txt",row.names = F,sep="\t",quote=F)
 
 #find independent novel regions
 novelpvaules1=novelpvalues[which(novelpvalues<5e-8)]
-idx=match(names(novelpvaules1),names(allpvalues))
-chr1=chr[idx]
-pos1=pos[idx]
-gr_novel1=GRanges(seqnames = chr1,ranges=IRanges(start=pos1,width=1))
-independentnovelvar=NULL
-n=1
-while (min(novelpvaules1)<5e-8 & n<length(novelpvaules1))
-{
-  idx=which.min(novelpvaules1)
-  if (novelpvaules1[idx]<5e-8) independentnovelvar=c(independentnovelvar,novelpvaules1[idx])
-  novelpvaules1[idx]=1
-  gr_snp=GRanges(seqnames = chr1[idx],ranges=IRanges(start=pos1[idx],width=1))
-  dist1=distance(gr_novel1,gr_snp)
-  idx1=which(dist1<1e6)
-  if(length(idx1)>0) novelpvaules1[c(idx1)]=1
-  n=n+1
-}
-length(independentnovelvar) #30
-tmp=data.frame(snp=names(independentnovelvar),p=independentnovelvar)
-
-tmp=data.frame(snp=names(independentnovelvar))
-write.table(tmp,file="../result/independentnovelsnp.txt",row.names = F,sep="\t",quote=F)
-
 #LD pruning
-plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
-plink2="/usr/local/apps/plink/2.3-alpha/plink2"
 pheno_onco=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concept_750_zhang_onco_pheno_v15_02_corrected.txt",header=T,sep="\t")
 fam=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1.psam")
 tmp=unlist(strsplit(fam$V1,"_"))
@@ -276,37 +265,36 @@ table(pheno_onco$EthnicityGeno[idx])
 onco_contrl=pheno_onco$Onc_ID[which(is.na(pheno_onco$Behaviour1))]
 onco_contrl=intersect(onco_contrl,fam$V3)
 onco_contrl1=paste0(onco_contrl,"_",onco_contrl)
-write.table(onco_contrl1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt",row.names = F,col.names = F,quote=F)
-cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt --extract ../result/independentnovelsnp.txt --make-bed --out ../result/onco_control_independentnovelsnp --memory 128000 --threads 8")
+#write.table(onco_contrl1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt",row.names = F,col.names = F,quote=F)
+cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt --extract ../result/novelsnp.txt --make-bed --out ../result/onco_control_novelpvaules1 --memory 64000 --threads 8")
 system(cmd)
-cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --recode A-transpose --out ../result/onco_control_independentnovelsnp")
-cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --freq --out ../result/onco_control_independentnovelsnp")
+#cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --recode A-transpose --out ../result/onco_control_independentnovelsnp")
+#cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --freq --out ../result/onco_control_independentnovelsnp")
 
-tmp=as.data.frame(fread("../result/onco_control_independentnovelsnp.bim"))
+tmp=as.data.frame(fread("../result/onco_control_novelpvaules1.bim"))
 onco_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1.pvar"))
-table(names(independentnovelvar) %in% onco_pvar$ID)
+table(names(novelpvaules1) %in% onco_pvar$ID)
 # FALSE  TRUE 
-# 7    23 
-oncomissing=names(independentnovelvar)[!names(independentnovelvar) %in% onco_pvar$ID]
+# 2    577 
+oncomissing=names(novelpvaules1)[!names(novelpvaules1) %in% onco_pvar$ID]
 
 pthr=1
 r2thr=0.1
-kbpthr=10000
+#kbpthr=10000
 
 # cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
 #            pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field snp --clump-field p --out ../result/onco_independentnovel")
-cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
-           pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/onco_independentnovel")
+cmd=paste0(plink," --bfile ../result/onco_control_novelpvaules1"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+           pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/onco_novelpvaules1")
 
 system(cmd)
-#23 --> 23
-onco_clumping=read.table("../result/onco_independentnovel.clumped",header=T)
-
+#37
+onco_clumping=read.table("../result/onco_novelpvaules1.clumped",header=T)
 
 icogs_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.pvar"))
-table(names(independentnovelvar) %in% icogs_pvar$ID)
-# FALSE  TRUE 
-# 1    29
+table(names(novelpvaules1) %in% icogs_pvar$ID)
+# TRUE 
+# 579
 table(oncomissing %in% icogs_pvar$ID)
 pheno_icogs=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concept_750_zhang_icogs_pheno_v15_02.txt",header=T,sep="\t")
 fam_icogs=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.psam")
@@ -318,26 +306,115 @@ icogs_contrl=pheno_icogs$SG_ID[which(is.na(pheno_icogs$Behaviour1))]
 icogs_contrl=intersect(icogs_contrl,fam_icogs$V3)
 icogs_contrl1=paste0(icogs_contrl,"_",icogs_contrl)
 write.table(icogs_contrl1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/icogs_control.txt",row.names = F,col.names = F,quote=F)
-cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/icogs_control.txt --extract ../result/independentnovelsnp.txt --make-bed --out ../result/icogs_control_independentnovelsnp --memory 128000 --threads 8")
+cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/icogs_control.txt --extract ../result/novelsnp.txt --make-bed --out ../result/icogs_control_novelpvaules1 --memory 64000 --threads 8")
 system(cmd)
-cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --recode A-transpose --out ../result/icogs_control_independentnovelsnp")
-cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --freq --out ../result/icogs_control_independentnovelsnp")
+# cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --recode A-transpose --out ../result/icogs_control_independentnovelsnp")
+# cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --freq --out ../result/icogs_control_independentnovelsnp")
 
 # cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
 #            pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field snp --clump-field p --out ../result/icogs_independentnovel")
-cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
-           pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/icogs_independentnovel")
+cmd=paste0(plink," --bfile ../result/icogs_control_novelpvaules1"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+           pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/icogs_novelpvaules1")
 system(cmd)
-icogs_independentnovel=read.table("../result/icogs_control_independentnovelsnp.bim")
-names(independentnovelvar)[!names(independentnovelvar) %in% icogs_independentnovel$V2]
-#chr6:52468337:G:A
-#30 --> 30
-#total is 30 (29+1)
-icogs_clumping=read.table("../result/icogs_independentnovel.clumped",header=T)
-allnovelsnps=c("chr6:52468337:G:A",icogs_clumping$SNP)
-allnovelsnps=data.frame(ID=allnovelsnps,chr=NA,pos=NA,rsid=NA,pvalue=NA)
-idx=match(allnovelsnps$ID,names(allpvalues))
-allnovelsnps$pvalue=allpvalues[idx]
+#44
+icogs_clumping=read.table("../result/icogs_novelpvaules1.clumped",header=T)
+
+novelpvaules2=novelpvaules1[names(novelpvaules1) %in% icogs_clumping$SNP]
+idx=match(names(novelpvaules2),names(allpvalues))
+chr1=chr[idx]
+pos1=pos[idx]
+gr_novel1=GRanges(seqnames = chr1,ranges=IRanges(start=pos1,width=1))
+independentnovelvar=NULL
+n=1
+while (min(novelpvaules2)<5e-8 & n<length(novelpvaules2))
+{
+  idx=which.min(novelpvaules2)
+  if (novelpvaules2[idx]<5e-8) independentnovelvar=c(independentnovelvar,novelpvaules2[idx])
+  novelpvaules2[idx]=1
+  gr_snp=GRanges(seqnames = chr1[idx],ranges=IRanges(start=pos1[idx],width=1))
+  dist1=distance(gr_novel1,gr_snp)
+  idx1=which(dist1<1e6)
+  if(length(idx1)>0) novelpvaules2[c(idx1)]=1
+  n=n+1
+}
+length(independentnovelvar) #17
+tmp=data.frame(snp=names(independentnovelvar),p=independentnovelvar)
+
+tmp=data.frame(snp=names(independentnovelvar))
+write.table(tmp,file="../result/independentnovelsnp.txt",row.names = F,sep="\t",quote=F)
+
+# #LD pruning
+# pheno_onco=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concept_750_zhang_onco_pheno_v15_02_corrected.txt",header=T,sep="\t")
+# fam=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1.psam")
+# tmp=unlist(strsplit(fam$V1,"_"))
+# fam$V3=tmp[seq(1,length(tmp),2)]
+# idx=match(fam$V3,pheno_onco$Onc_ID)
+# table(pheno_onco$EthnicityGeno[idx])
+# onco_contrl=pheno_onco$Onc_ID[which(is.na(pheno_onco$Behaviour1))]
+# onco_contrl=intersect(onco_contrl,fam$V3)
+# onco_contrl1=paste0(onco_contrl,"_",onco_contrl)
+# write.table(onco_contrl1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt",row.names = F,col.names = F,quote=F)
+# cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_control.txt --extract ../result/independentnovelsnp.txt --make-bed --out ../result/onco_control_independentnovelsnp --memory 128000 --threads 8")
+# system(cmd)
+# cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --recode A-transpose --out ../result/onco_control_independentnovelsnp")
+# cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp --freq --out ../result/onco_control_independentnovelsnp")
+# 
+# tmp=as.data.frame(fread("../result/onco_control_independentnovelsnp.bim"))
+# onco_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1.pvar"))
+# table(names(independentnovelvar) %in% onco_pvar$ID)
+# # FALSE  TRUE 
+# # 1    18 
+# oncomissing=names(independentnovelvar)[!names(independentnovelvar) %in% onco_pvar$ID]
+# 
+# pthr=1
+# r2thr=0.1
+# kbpthr=10000
+# 
+# # cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+# #            pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field snp --clump-field p --out ../result/onco_independentnovel")
+# cmd=paste0(plink," --bfile ../result/onco_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+#            pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/onco_independentnovel")
+# 
+# system(cmd)
+# #18 --> 18
+# onco_clumping=read.table("../result/onco_independentnovel.clumped",header=T)
+# 
+# 
+# icogs_pvar=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.pvar"))
+# table(names(independentnovelvar) %in% icogs_pvar$ID)
+# # TRUE 
+# # 19
+# table(oncomissing %in% icogs_pvar$ID)
+# pheno_icogs=read.table("/data/BB_Bioinformatics/ProjectData/BCAC/phenotype/concept_750_zhang_icogs_pheno_v15_02.txt",header=T,sep="\t")
+# fam_icogs=read.table("/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1.psam")
+# tmp=unlist(strsplit(fam_icogs$V1,"_"))
+# fam_icogs$V3=tmp[seq(1,length(tmp),2)]
+# idx=match(fam_icogs$V3,pheno_icogs$SG_ID)
+# table(pheno_icogs$EthnicityGeno[idx])
+# icogs_contrl=pheno_icogs$SG_ID[which(is.na(pheno_icogs$Behaviour1))]
+# icogs_contrl=intersect(icogs_contrl,fam_icogs$V3)
+# icogs_contrl1=paste0(icogs_contrl,"_",icogs_contrl)
+# write.table(icogs_contrl1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/icogs_control.txt",row.names = F,col.names = F,quote=F)
+# cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/icogs_control.txt --extract ../result/independentnovelsnp.txt --make-bed --out ../result/icogs_control_independentnovelsnp --memory 128000 --threads 8")
+# system(cmd)
+# cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --recode A-transpose --out ../result/icogs_control_independentnovelsnp")
+# cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp --freq --out ../result/icogs_control_independentnovelsnp")
+# 
+# # cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+# #            pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field snp --clump-field p --out ../result/icogs_independentnovel")
+# cmd=paste0(plink," --bfile ../result/icogs_control_independentnovelsnp"," --clump ../result/novelpvalues.txt"," --clump-p1 ",
+#            pthr," --clump-r2 ",r2thr," --clump-snp-field snp --clump-field p --out ../result/icogs_independentnovel")
+# system(cmd)
+# icogs_independentnovel=read.table("../result/icogs_control_independentnovelsnp.bim")
+# names(independentnovelvar)[!names(independentnovelvar) %in% icogs_independentnovel$V2]
+# #total is 19
+# icogs_clumping=read.table("../result/icogs_independentnovel.clumped",header=T)
+# #allnovelsnps=c("chr6:52468337:G:A",icogs_clumping$SNP)
+# allnovelsnps=icogs_clumping$SNP
+allnovelsnps=independentnovelvar
+allnovelsnps=data.frame(ID=names(allnovelsnps),chr=NA,pos=NA,rsid=NA,pvalue=allnovelsnps)
+# idx=match(allnovelsnps$ID,names(allpvalues))
+# allnovelsnps$pvalue=allpvalues[idx]
 tmp=unlist(strsplit(allnovelsnps$ID,":"))
 allnovelsnps$chr=tmp[seq(1,length(tmp),4)]
 allnovelsnps$chr=gsub("chr","",allnovelsnps$chr)
@@ -395,10 +472,10 @@ allnovelsnps$dist2nearestknown=tmp@elementMetadata@listData$distance
 all(knownvar$hg38position==start(gr_knownvar1))
 table(allnovelsnps$dist2nearestknown<2e6)
 # FALSE  TRUE 
-# 20    10
+# 11    6
 quantile(allnovelsnps$dist2nearestknown)
 # 0%      25%      50%      75%     100% 
-# 550583  1403882  2769633  6586420 28452496
+# 550583   709328  2580815  6869045 28452496
 allnovelsnps0=allnovelsnps[allnovelsnps$dist2nearestknown>2e6,]
 write.table(allnovelsnps0,file="../result/allnovelsnps0.txt",row.names = F,sep="\t",quote=F)
 #for those within 2MB of known variants, find the knownvar in +-2MB
@@ -443,96 +520,96 @@ for(i in 1:nrow(allnovelsnps1))
 #all the closest knowvar can be found in the result
 write.table(allnovelsnps1,file="../result/allnovelsnps1.txt",row.names = F,sep="\t",quote=F)
 
-tmp1=as.data.frame(fread("../result/onco_control_independentnovelsnp.traw"))
-rownames(tmp1)=tmp1$SNP
-tmp1=tmp1[,-c(1:6)]
-tmp2=read.table("../result/onco_control_independentnovelsnp.frq",header = T)
-quantile(tmp2$MAF)
-# 0%       25%       50%       75%      100% 
-# 0.0009262 0.0085740 0.0491500 0.2545750 0.4734000
-idx1=which(rownames(tmp1)=="chr1:120953531:C:T")
-idx2=which(rownames(tmp1)=="chr1:120425254:C:G")
-idx3=which(rownames(tmp1)=="chr1:143209281:C:A")
-cor(unlist(tmp1[idx1,]),unlist(tmp1[idx2,]),use="complete") #0.58
-cor(unlist(tmp1[idx1,]),unlist(tmp1[idx3,]),use="complete") #0.48
-idx1=which(rownames(tmp1)=="chr1:144450288:G:A")
-idx2=which(rownames(tmp1)=="chr1:143209281:C:A")
-cor(unlist(tmp1[idx1,]),unlist(tmp1[idx2,]),use="complete") #0.23
-
-onco_sample=pheno_onco$Onc_ID[c(which(is.na(pheno_onco$Behaviour1)),which(pheno_onco$Behaviour1==1))]
-onco_sample=intersect(onco_sample,fam$V3)
-onco_sample1=paste0(onco_sample,"_",onco_sample)
-write.table(onco_sample1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_sample.txt",row.names = F,col.names = F,quote=F)
-cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_sample.txt --extract ../result/novelsnp.txt --make-pgen --out ../result/onco_novelsnp --memory 128000 --threads 8")
-system(cmd)
-cmd=paste0(plink2," --pfile ../result/onco_novelsnp --recode A-transpose --out ../result/onco_novelsnp")
-onconovel=as.data.frame(fread("../result/onco_novelsnp.traw"))
-rownames(onconovel)=onconovel$SNP
-onconovel=onconovel[,-c(1:6)]
-fam1=read.table("../result/onco_novelsnp.psam")
-tmp=unlist(strsplit(fam1$V1,"_"))
-fam1$V3=tmp[seq(1,length(tmp),2)]
-idx=match(fam1$V3,pheno_onco$Onc_ID)
-y=pheno_onco$Behaviour1[idx]
-y[is.na(y)]=0
-idx=which(rownames(onconovel)=="chr9:119662503:T:C")
-fm=glm(y~unlist(onconovel[idx,]),family = binomial)
-summary(fm)$coefficients
-
-boxplot(unlist(onconovel[idx,])~y)
-tmp=unlist(onconovel[idx,])
-idx=y==0
-hist(tmp[idx])
-hist(tmp[!idx])
-quantile(tmp[idx])
-quantile(tmp[!idx])
-
-
-write.table(independentnovelvar,file="../result/independentnovelvar.txt",row.names = F,quote=F)
-tmp=unlist(strsplit(names(independentnovelvar),":"))
-chr2=tmp[seq(1,length(tmp),4)]
-pos2=tmp[seq(2,length(tmp),4)]
-
-
-knownvar$foundminp=knownvar$foundpos=knownvar$founddist=knownvar$nearestdist=knownvar$nearesp=NA
-for(i in 1:nrow(knownvar))
-{
-  tmp1=distance(gr_allpvalues,gr_knownvar[i])
-  idx=which(tmp1==0)
-  if (length(idx)>0)
-  {
-    idx1=which.min(allpvalues[idx])
-    knownvar$foundminp[i]=allpvalues[idx[idx1]]
-    knownvar$foundpos[i]=pos[idx[idx1]]
-    knownvar$founddist[i]=abs(knownvar$foundpos[i]-knownvar$hg38position[i])
-  }
-  tmp1=distance(gr_allpvalues,gr_knownvar1[i])
-  idx=which.min(tmp1)
-  knownvar$nearesp[i]=allpvalues[idx]
-  knownvar$nearestdist[i]=tmp1[idx]
-}
-write.table(knownvar,file ="../result/218_known_discovery_snp_paper_order_101323_overlap.txt",row.names = F,quote=F,sep="\t")
-#knownvar=read.table("../result/218_known_discovery_snp_paper_order_101323_overlap.txt",header = T,sep="\t")
-table(knownvar$foundminp<5e-8,useNA="ifany")
-# FALSE  TRUE   
-#   68   150  
-table(knownvar$nearesp[knownvar$nearestdist==0]<5e-8,useNA="ifany")
-# FALSE  TRUE 
-# 137    81
-quantile(knownvar$nearesp[knownvar$nearestdist==0])
-table(knownvar$nearestdist==0)
-# FALSE  TRUE 
-# 19   199
-quantile(knownvar$foundminp,na.rm=T)
-idx=which(neardist@elementMetadata@listData$distance==0)
-knownpvalues=allpvalues[idx]
-sum(knownpvalues<5e-8) #12961
+# tmp1=as.data.frame(fread("../result/onco_control_independentnovelsnp.traw"))
+# rownames(tmp1)=tmp1$SNP
+# tmp1=tmp1[,-c(1:6)]
+# tmp2=read.table("../result/onco_control_independentnovelsnp.frq",header = T)
+# quantile(tmp2$MAF)
+# # 0%       25%       50%       75%      100% 
+# # 0.0009262 0.0085740 0.0491500 0.2545750 0.4734000
+# idx1=which(rownames(tmp1)=="chr1:120953531:C:T")
+# idx2=which(rownames(tmp1)=="chr1:120425254:C:G")
+# idx3=which(rownames(tmp1)=="chr1:143209281:C:A")
+# cor(unlist(tmp1[idx1,]),unlist(tmp1[idx2,]),use="complete") #0.58
+# cor(unlist(tmp1[idx1,]),unlist(tmp1[idx3,]),use="complete") #0.48
+# idx1=which(rownames(tmp1)=="chr1:144450288:G:A")
+# idx2=which(rownames(tmp1)=="chr1:143209281:C:A")
+# cor(unlist(tmp1[idx1,]),unlist(tmp1[idx2,]),use="complete") #0.23
+# 
+# onco_sample=pheno_onco$Onc_ID[c(which(is.na(pheno_onco$Behaviour1)),which(pheno_onco$Behaviour1==1))]
+# onco_sample=intersect(onco_sample,fam$V3)
+# onco_sample1=paste0(onco_sample,"_",onco_sample)
+# write.table(onco_sample1,file="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_sample.txt",row.names = F,col.names = F,quote=F)
+# cmd=paste0(plink2," --pfile /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 --keep /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/onco_sample.txt --extract ../result/novelsnp.txt --make-pgen --out ../result/onco_novelsnp --memory 128000 --threads 8")
+# system(cmd)
+# cmd=paste0(plink2," --pfile ../result/onco_novelsnp --recode A-transpose --out ../result/onco_novelsnp")
+# onconovel=as.data.frame(fread("../result/onco_novelsnp.traw"))
+# rownames(onconovel)=onconovel$SNP
+# onconovel=onconovel[,-c(1:6)]
+# fam1=read.table("../result/onco_novelsnp.psam")
+# tmp=unlist(strsplit(fam1$V1,"_"))
+# fam1$V3=tmp[seq(1,length(tmp),2)]
+# idx=match(fam1$V3,pheno_onco$Onc_ID)
+# y=pheno_onco$Behaviour1[idx]
+# y[is.na(y)]=0
+# idx=which(rownames(onconovel)=="chr9:119662503:T:C")
+# fm=glm(y~unlist(onconovel[idx,]),family = binomial)
+# summary(fm)$coefficients
+# 
+# boxplot(unlist(onconovel[idx,])~y)
+# tmp=unlist(onconovel[idx,])
+# idx=y==0
+# hist(tmp[idx])
+# hist(tmp[!idx])
+# quantile(tmp[idx])
+# quantile(tmp[!idx])
+# 
+# 
+# write.table(independentnovelvar,file="../result/independentnovelvar.txt",row.names = F,quote=F)
+# tmp=unlist(strsplit(names(independentnovelvar),":"))
+# chr2=tmp[seq(1,length(tmp),4)]
+# pos2=tmp[seq(2,length(tmp),4)]
+# 
+# 
+# knownvar$foundminp=knownvar$foundpos=knownvar$founddist=knownvar$nearestdist=knownvar$nearesp=NA
+# for(i in 1:nrow(knownvar))
+# {
+#   tmp1=distance(gr_allpvalues,gr_knownvar[i])
+#   idx=which(tmp1==0)
+#   if (length(idx)>0)
+#   {
+#     idx1=which.min(allpvalues[idx])
+#     knownvar$foundminp[i]=allpvalues[idx[idx1]]
+#     knownvar$foundpos[i]=pos[idx[idx1]]
+#     knownvar$founddist[i]=abs(knownvar$foundpos[i]-knownvar$hg38position[i])
+#   }
+#   tmp1=distance(gr_allpvalues,gr_knownvar1[i])
+#   idx=which.min(tmp1)
+#   knownvar$nearesp[i]=allpvalues[idx]
+#   knownvar$nearestdist[i]=tmp1[idx]
+# }
+# write.table(knownvar,file ="../result/218_known_discovery_snp_paper_order_101323_overlap.txt",row.names = F,quote=F,sep="\t")
+# #knownvar=read.table("../result/218_known_discovery_snp_paper_order_101323_overlap.txt",header = T,sep="\t")
+# table(knownvar$foundminp<5e-8,useNA="ifany")
+# # FALSE  TRUE   
+# #   68   150  
+# table(knownvar$nearesp[knownvar$nearestdist==0]<5e-8,useNA="ifany")
+# # FALSE  TRUE 
+# # 137    81
+# quantile(knownvar$nearesp[knownvar$nearestdist==0])
+# table(knownvar$nearestdist==0)
+# # FALSE  TRUE 
+# # 19   199
+# quantile(knownvar$foundminp,na.rm=T)
+# idx=which(neardist@elementMetadata@listData$distance==0)
+# knownpvalues=allpvalues[idx]
+# sum(knownpvalues<5e-8) #12961
 
 
 
 #position_nudge()
 #qqplot,manhattan plot
-load("../result/metascoreinfo4.RData")
+load("../result/metascoreinfo4_new.RData")
 
 library(data.table)
 library("plotrix") #axis.break

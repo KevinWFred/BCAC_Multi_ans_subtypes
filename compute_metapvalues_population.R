@@ -440,7 +440,7 @@ save(collect_pvalues_euro,collect_pvalues_asian,collect_pvalues_african,file="..
 
 
 #qqplot,manhattan plot
-load("../result/metascoreinfo4.RData")
+load("../result/metascoreinfo4_new.RData")
 
 library(data.table)
 library("plotrix") #axis.break
@@ -708,8 +708,22 @@ myplot=function(myallpvalues=allpvalues,outprefix="waldtest_meta")
   dev.off()
   plotmanhattan(data=data1,title="",filename=paste0("../result/man_",outprefix,".png"))
 }
+load("../result/compute_metapvalues_new.RData")
+allpvalues=allpvalues[names(allpvalues) %in% names(metascoreinfo4$maxfreq[metascoreinfo4$maxfreq>0.01])]
+tmp=collect_pvalues_euro$acatpvalues
+tmp=tmp[names(tmp) %in% names(allpvalues)]
+myplot(myallpvalues=tmp,outprefix="ACAT_European_meta")
+tmp=collect_pvalues_asian$acatpvalues
+tmp=tmp[names(tmp) %in% names(allpvalues)]
+myplot(myallpvalues=tmp,outprefix="ACAT_Asian_meta")
+tmp=collect_pvalues_african$acatpvalues
+tmp=tmp[names(tmp) %in% names(allpvalues)]
+myplot(myallpvalues=tmp,outprefix="ACAT_African_meta")
 
-myplot(myallpvalues=collect_pvalues_euro$acatpvalues,outprefix="ACAT_European_meta")
-myplot(myallpvalues=collect_pvalues_asian$acatpvalues,outprefix="ACAT_Asian_meta")
-myplot(myallpvalues=collect_pvalues_african$acatpvalues,outprefix="ACAT_African_meta")
-
+#check African
+tmp=collect_pvalues_african$allintrinsicres$P
+names(tmp)=rownames(collect_pvalues_african$allintrinsicres)
+myplot(myallpvalues=tmp,outprefix="Intrinsic_African_meta")
+tmp=collect_pvalues_african$allscoreres$P
+names(tmp)=rownames(collect_pvalues_african$allscoreres)
+myplot(myallpvalues=tmp,outprefix="Scoretest_African_meta")

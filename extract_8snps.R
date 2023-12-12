@@ -150,3 +150,64 @@ icogsdat2=t(icogsdat$dat)
 idx=match(rownames(icogsdat2),icogsdat1$SG_ID)
 icogsdat2=cbind(icogsdat1[idx,],icogsdat2)
 write.csv(icogsdat2,file="../result/eightsnp_icogsdata.csv",row.names = F,quote=F)
+
+#for this snp
+snp="chr9:119662503:T:C"
+checkpos=data.frame(chr=9,start=119662502,end=119662504,snp="chr9:119662503:T:C")
+write.table(checkpos,file="../result/tmp/checksnp.range",row.names = F,col.names = F,sep=" ",quote=F)
+infolder="/data/BB_Bioinformatics/ProjectData/BCAC/onco/"
+prefix1="zhang_750_asian_topmed_9"
+cmd=paste0(plink2," --bgen ",infolder,prefix1,".bgen ref-unknown --extract range ../result/tmp/checksnp.range --make-pgen --out ../result/tmp/checkpos ",
+           " --memory 28000 --threads 10")
+system(cmd)
+cmd=paste0(plink2," --pfile ../result/tmp/checkpos --recode A-transpose --out ../result/tmp/checkpos")
+system(cmd)
+tmp=as.data.frame(fread("../result/tmp/checkpos.traw"))
+tmp=tmp[,7:ncol(tmp)]
+colnames(tmp)=gsub("^0_","",colnames(tmp))
+tmp1=unlist(strsplit(colnames(tmp),"_"))
+colnames(tmp)=tmp1[seq(1,length(tmp1),2)]
+pheno=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
+tmp=tmp[,colnames(tmp) %in% pheno$Onc_ID]
+idx=match(colnames(tmp),pheno$Onc_ID)
+idx1=which(is.na(pheno$Behaviour1[idx]))
+#MAF 0.00487
+sum(unlist(tmp[,idx1]))/2/length(idx1)  
+sum(unlist(tmp[]))/2/ncol(tmp) #0.0044
+
+infolder="/data/BB_Bioinformatics/ProjectData/BCAC/onco/"
+prefix1="zhang_750_topmed_9_p3"
+cmd=paste0(plink2," --bgen ",infolder,prefix1,".bgen ref-unknown --extract range ../result/tmp/checksnp.range --make-pgen --out ../result/tmp/checkpos1 ",
+           " --memory 28000 --threads 10")
+system(cmd)
+cmd=paste0(plink2," --pfile ../result/tmp/checkpos1 --recode A-transpose --out ../result/tmp/checkpos1")
+system(cmd)
+tmp=as.data.frame(fread("../result/tmp/checkpos1.traw"))
+tmp=tmp[,7:ncol(tmp)]
+colnames(tmp)=gsub("^0_","",colnames(tmp))
+tmp1=unlist(strsplit(colnames(tmp),"_"))
+colnames(tmp)=tmp1[seq(1,length(tmp1),2)]
+tmp=tmp[,colnames(tmp) %in% pheno$Onc_ID]
+idx=match(colnames(tmp),pheno$Onc_ID)
+idx1=which(is.na(pheno$Behaviour1[idx]))
+#MAF 0.003637787
+sum(unlist(tmp[,idx1]))/2/length(idx1)  
+sum(unlist(tmp[]))/2/ncol(tmp) #0.003652263
+
+prefix1="zhang_750_african_topmed_9"
+cmd=paste0(plink2," --bgen ",infolder,prefix1,".bgen ref-unknown --extract range ../result/tmp/checksnp.range --make-pgen --out ../result/tmp/checkpos2 ",
+           " --memory 28000 --threads 10")
+system(cmd)
+cmd=paste0(plink2," --pfile ../result/tmp/checkpos2 --recode A-transpose --out ../result/tmp/checkpos2")
+system(cmd)
+tmp=as.data.frame(fread("../result/tmp/checkpos2.traw"))
+tmp=tmp[,7:ncol(tmp)]
+colnames(tmp)=gsub("^0_","",colnames(tmp))
+tmp1=unlist(strsplit(colnames(tmp),"_"))
+colnames(tmp)=tmp1[seq(1,length(tmp1),2)]
+tmp=tmp[,colnames(tmp) %in% pheno$Onc_ID]
+idx=match(colnames(tmp),pheno$Onc_ID)
+idx1=which(is.na(pheno$Behaviour1[idx]))
+#MAF 0.00174171
+sum(unlist(tmp[,idx1]))/2/length(idx1)  
+sum(unlist(tmp[]))/2/ncol(tmp) #0.001401526

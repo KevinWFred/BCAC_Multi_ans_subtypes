@@ -58,96 +58,98 @@ readres=function(pop="euro",dataopt="onco",nvar=2000)
 # asian_icogs=readres(pop="asian",dataopt="icogs",nvar=2000)
 # african_onco=readres(pop="african",dataopt="onco",nvar=2000)
 
-# #read and combine the score/infor
-# load(paste0("../result/imp_","onco","/","euro","/scoretest/scoreinfor.RData"))
-# euro_onco=res
-# rm(res)
-# load(paste0("../result/imp_","icogs","/","euro","/scoretest/scoreinfor.RData"))
-# euro_icogs=res
-# rm(res)
-# load(paste0("../result/imp_","onco","/","asian","/scoretest/scoreinfor.RData"))
-# asian_onco=res
-# rm(res)
-# load(paste0("../result/imp_","icogs","/","asian","/scoretest/scoreinfor.RData"))
-# asian_icogs=res
-# rm(res)
-# load(paste0("../result/imp_","onco","/","african","/scoretest/scoreinfor.RData"))
-# african_onco=res
-# rm(res)
-# #first time opt="new", then opt="add". keep availability of variants in each data
-# aggregate_scoreinfor=function(res1=euro_onco,
-#                               res2=euro_icogs,n.second=5,opt="new",oldavail=NULL)
-# {
-#   #restrict to SNPs with allele frequency more than 0.006
-#   idx=which(res1$freq>0.006 & res1$freq < 0.994)
-#   res1$score=res1$score[idx,]
-#   res1$infor=res1$infor[idx,]
-#   res1$freq=res1$freq[idx]
-#   idx=which(res2$freq>0.006 & res2$freq < 0.994)
-#   res2$score=res2$score[idx,]
-#   res2$infor=res2$infor[idx,]
-#   res2$freq=res2$freq[idx]
-# 
-#   allvar=unique(c(rownames(res1$score),rownames(res2$score)))
-#   print(length(allvar))
-#   var1=rownames(res1$score)
-#   var2=rownames(res2$score)
-#   score=data.frame(matrix(0,nrow=length(allvar),ncol=n.second))
-#   infor=data.frame(matrix(0,nrow=length(allvar),ncol=n.second^2))
-#   rownames(score)=rownames(infor)=allvar
-#   idx1=match(var1,allvar)
-#   score[idx1,]=score[idx1,]+res1$score
-#   infor[idx1,]=infor[idx1,]+res1$infor
-#   idx2=match(var2,allvar)
-#   score[idx2,]=score[idx2,]+res2$score
-#   infor[idx2,]=infor[idx2,]+res2$infor
-#   freq=rep(0,length(allvar))
-#   names(freq)=allvar
-#   var1only=var1[!var1 %in% var2]
-#   var2only=var2[!var2 %in% var1]
-#   idx3=match(var1only,allvar)
-#   idx4=match(var1only,names(res1$freq))
-#   freq[idx3]=res1$freq[idx4]
-#   idx3=match(var2only,allvar)
-#   idx4=match(var2only,names(res2$freq))
-#   freq[idx3]=res1$freq[idx4]
-#   var12=intersect(var1,var2)
-#   idx3=match(var12,allvar)
-#   idx4=match(var12,names(res1$freq))
-#   idx5=match(var12,names(res2$freq))
-#   freq[idx3]=pmin(res1$freq[idx4],res2$freq[idx5])
-#   if (opt=="new")
-#   {
-#     avail=data.frame(matrix(0,nrow=length(allvar),ncol=2))
-#     rownames(avail)=allvar
-#     avail[idx1,1]=1
-#     avail[idx2,2]=1
-#   }else
-#   {
-#     avail=data.frame(matrix(0,nrow=length(allvar),ncol=ncol(oldavail)+1))
-#     rownames(avail)=allvar
-#     avail[idx1,1:ncol(oldavail)]=oldavail
-#     avail[idx2,ncol(avail)]=1
-#   }
-#   return(list(score=score,infor=infor,freq=freq,avail=avail))
-# }
-# # 
-# # metascoreinfo1=aggregate_scoreinfor()
-# metascoreinfo2=aggregate_scoreinfor(res1=metascoreinfo1,res2=asian_icogs,
-#                                     opt="add",oldavail=metascoreinfo1$avail)
-# metascoreinfo3=aggregate_scoreinfor(res1=metascoreinfo2,res2=asian_onco,
-#                                     opt="add",oldavail=metascoreinfo2$avail)
-# metascoreinfo4=aggregate_scoreinfor(res1=metascoreinfo3,res2=african_onco,
-#                                     opt="add",oldavail=metascoreinfo3$avail)
-#calculate the p-value for based on score statistics and information matrix
-#to perform fixed-effect test using chi-square test
-#we can use function ScoreGlobalTestForAssoc(score, infor)
-#to perform random-effect test using mixture chi-square test
-#we can use function ScoreMixedGlobalTestForHeter(score, infor)
-#table(metascoreinfo4$freq>0.01 & metascoreinfo4$freq<0.99)
-# FALSE     TRUE 
-# 3870641 14994842  
-#save(metascoreinfo4,file="../result/metascoreinfo4_new.RData") #new is the one remove MAF<0.006
+#read and combine the score/infor
+load(paste0("../result/imp_","onco","/","euro","/scoretest/scoreinfor.RData"))
+euro_onco=res
+rm(res)
+load(paste0("../result/imp_","icogs","/","euro","/scoretest/scoreinfor.RData"))
+euro_icogs=res
+rm(res)
+load(paste0("../result/imp_","onco","/","asian","/scoretest/scoreinfor.RData"))
+asian_onco=res
+rm(res)
+load(paste0("../result/imp_","icogs","/","asian","/scoretest/scoreinfor.RData"))
+asian_icogs=res
+rm(res)
+load(paste0("../result/imp_","onco","/","african","/scoretest/scoreinfor.RData"))
+african_onco=res
+rm(res)
+#first time opt="new", then opt="add". keep availability of variants in each data
+aggregate_scoreinfor=function(res1=euro_onco,
+                              res2=euro_icogs,n.second=5,opt="new",oldavail=NULL)
+{
+  #restrict to SNPs with allele frequency more than 0.006
+  idx=which(res1$freq>0.006 & res1$freq < 0.994)
+  res1$score=res1$score[idx,]
+  res1$infor=res1$infor[idx,]
+  res1$freq=res1$freq[idx]
+  idx=which(res2$freq>0.006 & res2$freq < 0.994)
+  res2$score=res2$score[idx,]
+  res2$infor=res2$infor[idx,]
+  res2$freq=res2$freq[idx]
+
+  allvar=unique(c(rownames(res1$score),rownames(res2$score)))
+  print(length(allvar))
+  var1=rownames(res1$score)
+  var2=rownames(res2$score)
+  score=data.frame(matrix(0,nrow=length(allvar),ncol=n.second))
+  infor=data.frame(matrix(0,nrow=length(allvar),ncol=n.second^2))
+  rownames(score)=rownames(infor)=allvar
+  idx1=match(var1,allvar)
+  score[idx1,]=score[idx1,]+res1$score
+  infor[idx1,]=infor[idx1,]+res1$infor
+  idx2=match(var2,allvar)
+  score[idx2,]=score[idx2,]+res2$score
+  infor[idx2,]=infor[idx2,]+res2$infor
+  #freq is minimum freq
+  freq=maxfreq=rep(0,length(allvar))
+  names(freq)=names(maxfreq)=allvar
+  var1only=var1[!var1 %in% var2]
+  var2only=var2[!var2 %in% var1]
+  idx3=match(var1only,allvar)
+  idx4=match(var1only,names(res1$freq))
+  freq[idx3]=maxfreq[idx3]=res1$freq[idx4]
+  idx3=match(var2only,allvar)
+  idx4=match(var2only,names(res2$freq))
+  freq[idx3]=maxfreq[idx3]=res2$freq[idx4]
+  var12=intersect(var1,var2)
+  idx3=match(var12,allvar)
+  idx4=match(var12,names(res1$freq))
+  idx5=match(var12,names(res2$freq))
+  freq[idx3]=pmin(res1$freq[idx4],res2$freq[idx5])
+  maxfreq[idx3]=pmax(res1$freq[idx4],res2$freq[idx5])
+  if (opt=="new")
+  {
+    avail=data.frame(matrix(0,nrow=length(allvar),ncol=2))
+    rownames(avail)=allvar
+    avail[idx1,1]=1
+    avail[idx2,2]=1
+  }else
+  {
+    avail=data.frame(matrix(0,nrow=length(allvar),ncol=ncol(oldavail)+1))
+    rownames(avail)=allvar
+    avail[idx1,1:ncol(oldavail)]=oldavail
+    avail[idx2,ncol(avail)]=1
+  }
+  return(list(score=score,infor=infor,freq=freq,maxfreq=maxfreq,avail=avail))
+}
+#
+metascoreinfo1=aggregate_scoreinfor()
+metascoreinfo2=aggregate_scoreinfor(res1=metascoreinfo1,res2=asian_icogs,
+                                    opt="add",oldavail=metascoreinfo1$avail)
+metascoreinfo3=aggregate_scoreinfor(res1=metascoreinfo2,res2=asian_onco,
+                                    opt="add",oldavail=metascoreinfo2$avail)
+metascoreinfo4=aggregate_scoreinfor(res1=metascoreinfo3,res2=african_onco,
+                                    opt="add",oldavail=metascoreinfo3$avail)
+# calculate the p-value for based on score statistics and information matrix
+# to perform fixed-effect test using chi-square test
+# we can use function ScoreGlobalTestForAssoc(score, infor)
+# to perform random-effect test using mixture chi-square test
+# we can use function ScoreMixedGlobalTestForHeter(score, infor)
+# table(metascoreinfo4$freq>0.01 & metascoreinfo4$freq<0.99)
+# FALSE     TRUE
+# 3870641 14994842
+save(metascoreinfo4,file="../result/metascoreinfo4_new.RData") #new is the one remove MAF<0.006
 load("../result/metascoreinfo4_new.RData")
 
 #compute p-values based on score and infor
@@ -457,6 +459,11 @@ save(allpvalues,file="../result/scoretestresult/allpvalues.Rdata")
 #          width=9, height=4, units="in", dpi=300)
 # }
 # load("../result/scoretestresult/allpvalues.Rdata")
+idx=match(names(allpvalues),rownames(metascoreinfo4$score))
+metascoreinfo4$score=metascoreinfo4$score[idx,]
+metascoreinfo4$infor=metascoreinfo4$infor[idx,]
+metascoreinfo4$freq=metascoreinfo4$freq[idx]
+metascoreinfo4$avail=metascoreinfo4$avail[idx,]
 # all(names(metascoreinfo4$freq)==names(allpvalues)) #T
 # idx=which(is.na(metascoreinfo4$freq))
 # quantile(allpvalues[idx])

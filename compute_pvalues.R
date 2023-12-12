@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+#intrinsic model p-values
 #meta analysis within a population (for intrinsic_subtypes_genome.R)
 .libPaths(c("/data/wangx53",.libPaths()))
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")

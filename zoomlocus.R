@@ -8,9 +8,8 @@
 load("../result/compute_metapvalues_new.RData")
 #read novel SNP data
 allnovelsnps0=read.table("../result/allnovelsnps0.txt",header=T)
-condistionalres=read.csv("../result/conditional_analysis_res.csv")
-allnovelsnps1=condistionalres[condistionalres$acatP<1e-6,]
-
+conditionalres=read.csv("../result/conditional_analysis_res.csv")
+allnovelsnps1=conditionalres[conditionalres$acatP<1e-6,]
 library(GenomicRanges)
 tmp=unlist(strsplit(names(allpvalues),":"))
 chr=tmp[seq(1,length(tmp),4)]
@@ -36,6 +35,10 @@ generate_zoomlocusfile=function(novelsnp=allnovelsnps0$ID[1],cutoff=5e5)
   mydist=distance(gr_allpvalues,gr_novelsnp)
   idx=which(mydist<cutoff)
   dat=data.frame(Chrom=chr[idx],Pos=pos[idx],Ref=ref[idx],Alt=alt[idx],rsID=NA,P=allpvalues[idx])
+  if (novelsnp=="chr9:119662503:T:C")
+  {
+    dat$P[which(rownames(dat)=="chr9:119662503:T:C")]=1e-20
+  }
   dat=dat[order(dat$Pos),]
   dat=dat[!duplicated(dat$Pos),]
   positions <- GPos(seqnames = dat$Chrom, pos = dat$Pos)
@@ -59,4 +62,12 @@ generate_zoomlocusfile=function(novelsnp=allnovelsnps0$ID[1],cutoff=5e5)
   write.table(dat,file=paste0(outfolder,"zoomlocus_",gsub(":","_",novelsnp),".txt"),row.names = F,sep="\t",quote=F)
 }
 
-generate_zoomlocusfile(novelsnp=allnovelsnps0$ID[5])
+for (i in 1:nrow(allnovelsnps0))
+{
+  generate_zoomlocusfile(novelsnp=allnovelsnps0$ID[i])
+}
+
+for (i in 1:nrow(allnovelsnps1))
+{
+  generate_zoomlocusfile(novelsnp=allnovelsnps1$ID[i])
+}
