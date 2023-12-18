@@ -1,6 +1,10 @@
 #!/usr/bin/env Rscript
 
-# Split the EUR and EAS data into training, tuning, validation. iCOGs will be kept as training, OncoArray will be used as training, tuning, validation. The proportion of training, tuning, validation is roughly 70%, 15%, 15% within EUR, EAS. All of AFR and Latino will be used as validation. 
+# Split the EUR and EAS data into training, tuning, validation. iCOGs will be kept as training, OncoArray will be used as training, tuning, validation. The proportion of training, tuning, validation is roughly 70%, 15%, 15% within EUR, EAS. All of AFR and Latino will be used as validation.
+#first, in EUR/EAS onco pick tuning and validation
+#second, put African into validation
+#third, the rest go to training
+
 library(data.table)
 #samples with age/casecontrol/genotype
 pheno_icogs0=as.data.frame(fread("../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",header=T))
@@ -109,6 +113,46 @@ table(training_icogs$EthnicityGeno)
 write.table(training_icogs,file="../result/PRS_icogs_trainingpheno.txt",row.names = F,sep="\t",quote = F)
 write.table(training_onco,file="../result/PRS_onco_trainingpheno.txt",row.names = F,sep="\t",quote = F)
 nrow(training_icogs)+nrow(training_onco)+nrow(tuning)+nrow(validation_icogs)+nrow(validation_onco)==nrow(pheno_icogs0)+nrow(pheno_onco0)
+
+nrow(training_icogs[which(training_icogs$Behaviour1==1),])+nrow(training_onco[which(training_onco$Behaviour1==1),]) #81538
+nrow(training_icogs[which(is.na(training_icogs$Behaviour1)),])+nrow(training_onco[which(is.na(training_onco$Behaviour1)),]) #73003
+
+nrow(training_icogs[which(training_icogs$EthnicityGeno=="European" & training_icogs$Behaviour1==1),])+nrow(training_onco[which(training_onco$EthnicityGeno=="European" &training_onco$Behaviour1==1),]) #69111
+nrow(training_icogs[which(training_icogs$EthnicityGeno=="European" & is.na(training_icogs$Behaviour1)),])+nrow(training_onco[which(training_onco$EthnicityGeno=="European" &is.na(training_onco$Behaviour1)),]) #60204
+
+nrow(training_icogs[which(training_icogs$EthnicityGeno=="Asian" & training_icogs$Behaviour1==1),])+nrow(training_onco[which(training_onco$EthnicityGeno=="Asian" &training_onco$Behaviour1==1),]) #12427
+nrow(training_icogs[which(training_icogs$EthnicityGeno=="Asian" & is.na(training_icogs$Behaviour1)),])+nrow(training_onco[which(training_onco$EthnicityGeno=="Asian" &is.na(training_onco$Behaviour1)),]) #12799
+
+nrow(tuning[which(tuning$Behaviour1==1),]) #17471
+nrow(tuning[which(is.na(tuning$Behaviour1)),]) #15642
+
+nrow(tuning[which(tuning$Behaviour1==1 & tuning$EthnicityGeno=="European"),]) #14809
+nrow(tuning[which(is.na(tuning$Behaviour1 & tuning$EthnicityGeno=="European")),]) #12900
+
+nrow(tuning[which(tuning$Behaviour1==1 & tuning$EthnicityGeno=="Asian"),]) #2662
+nrow(tuning[which(is.na(tuning$Behaviour1 & tuning$EthnicityGeno=="Asian")),]) #2742
+
+table(validation_icogs$EthnicityGeno)
+# African 
+# 1758
+table(validation_onco$EthnicityGeno)
+# African    Asian European    other 
+# 5569     5406    27710     2413 
+nrow(validation_icogs[which(validation_icogs$Behaviour1==1),])+nrow(validation_onco[which(validation_onco$Behaviour1==1),]) #23089
+nrow(validation_icogs[which(is.na(validation_icogs$Behaviour1)),])+nrow(validation_onco[which(is.na(validation_onco$Behaviour1)),]) #19767
+
+nrow(validation_icogs[which(validation_icogs$Behaviour1==1),])+nrow(validation_onco[which(validation_onco$EthnicityGeno=="African" & validation_onco$Behaviour1==1),]) #4422
+nrow(validation_icogs[which(is.na(validation_icogs$Behaviour1)),])+nrow(validation_onco[which(validation_onco$EthnicityGeno=="African" & is.na(validation_onco$Behaviour1)),]) #2905
+
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="Asian" & validation_onco$Behaviour1==1),]) #2663
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="Asian" & is.na(validation_onco$Behaviour1)),]) #2743
+
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="European" & validation_onco$Behaviour1==1),]) #14809
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="European" & is.na(validation_onco$Behaviour1)),]) #12901
+
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="other" & validation_onco$Behaviour1==1),]) #1195
+nrow(validation_onco[which(validation_onco$EthnicityGeno=="other" & is.na(validation_onco$Behaviour1)),]) #1218
+
 get_table2=function(dat1=training_icogs[training_icogs$EthnicityGeno=="European",],
                     dat2=training_onco[training_onco$EthnicityGeno=="European",])
 {
