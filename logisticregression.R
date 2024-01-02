@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
 .libPaths(c("/data/wangx53",.libPaths()))
+library(data.table)
 
 plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
 plink2="/usr/local/apps/plink/2.3-alpha/plink2"
@@ -154,7 +155,6 @@ names(metapvalues)=metares$SNP
 
 load("../result/metascoreinfo4_new.RData")
 
-library(data.table)
 library("plotrix") #axis.break
 library("RColorBrewer")
 library("optparse")

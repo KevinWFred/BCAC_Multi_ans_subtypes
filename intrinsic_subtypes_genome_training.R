@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 #run on genome-wide for 750 icogs/onco data (before meta) on training samples
 #all training samples from euro/asian on icogs/oncoarray
+#bug: if not converged on many SNPs, memory will accumulate to exceed the limit; jobs got killed (EURO onco training).
 
 .libPaths(c("/data/wangx53",.libPaths()))
 library(readr)
@@ -131,6 +132,8 @@ set.seed(123)
 #myarg <- commandarg[length(commandarg)]
 #myarg <- sub("-","",myarg)
 #i1 <- as.numeric(myarg)
+
+#training samples
 trainingsamples_icogs=read.table("../result/PRS_icogs_trainingpheno.txt",sep="\t",header=T)
 trainingsamples_onco=read.table("../result/PRS_onco_trainingpheno.txt",sep="\t",header=T)
 
@@ -155,7 +158,7 @@ if (dataopt=="icogs")
   colnames(pheno)[which(colnames(pheno)=="SG_ID")]="ID"
   #only includes training samples
   pheno=pheno[pheno$ID %in% trainingsamples_icogs$SG_ID,]
-  samplefile="../result/icogs_samples_750.txt"
+  #samplefile="../result/icogs_samples_750.txt"
 }else
 {
   genofile=paste0("../result/imp_onco/",pop,"/geno/geno_",i1,".traw.gz")
@@ -165,12 +168,17 @@ if (dataopt=="icogs")
   pheno=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
   colnames(pheno)[which(colnames(pheno)=="Onc_ID")]="ID"
   pheno=pheno[pheno$ID %in% trainingsamples_onco$Onc_ID,]
-  samplefile="../result/onco_samples_750.txt"
+  #samplefile="../result/onco_samples_750.txt"
 }
-
-#samples included in the analysis
-allsamples=read.table(samplefile)$V1
-
+if (pop=="asian")
+{
+  pheno=pheno[pheno$EthnicityGeno %in% "Asian", ]
+}
+if (pop=="euro")
+{
+  pheno=pheno[pheno$EthnicityGeno %in% "European", ]
+}
+print(paste0("outfolder:",outfolder))
 
 #read genotype data
 genodat=as.data.frame(fread(genofile))
@@ -180,15 +188,15 @@ genodat=genodat[,7:ncol(genodat)]
 tmp=unlist(strsplit(colnames(genodat),"_"))
 tmp1=unlist(strsplit(colnames(genodat)[1],"_"))
 tmp2=tmp[seq(1,length(tmp),length(tmp1))]
-if (length(tmp2) !=ncol(genodat)) stop("Sampel names are not correct")
+if (length(tmp2) !=ncol(genodat)) stop("Sample names are not correct")
 colnames(genodat)=tmp2
-##for now, only use EUR samples
-#allsamples=intersect(allsamples,pheno$ID[which(pheno$EthnicityGeno=="European")])
-#table(colnames(genodat) %in% allsamples)
-allsamples=intersect(allsamples,colnames(genodat)) #pick samples from an ancestry
+allsamples=pheno$ID
 #make pheno and genodat consistent in sample orders
 idx=match(allsamples,colnames(genodat))
+if (sum(is.na(idx))>0) stop("check samples!")
 genodat=genodat[,idx]
+idx=match(allsamples,pheno$ID)
+if (sum(is.na(idx))>0) stop("check samples!!")
 pheno=pheno[match(allsamples,pheno$ID),]
 #number of snps in the current block
 nsnps=nrow(genodat) 
@@ -389,7 +397,7 @@ print("Done")
 print(Sys.time())
 
 #create swarm files
-create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_icogs",nvar=2000,pop="euro",dataopt="icogs")
+create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_icogs_training",nvar=2000,pop="euro",dataopt="icogs")
 {
   pvar=as.data.frame(fread(paste0(prefix,".pvar")))
   infolder=paste0(dirname(prefix),"/geno/")
@@ -407,11 +415,11 @@ create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_ico
   {
     if (i<m)
     {
-      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R",2000),
+      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome_training.R",2000),
                      dataopt=dataopt,pop=pop,i1=((i-1)*4000+1):(i*4000))
     }else
     {
-      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome.R"),
+      tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome_training.R"),
                      dataopt=dataopt,pop=pop,i1=((i-1)*4000+1):n)
     }
     
@@ -419,41 +427,30 @@ create_swarm=function(prefix="../result/imp_icogs/euro/euro",outprefix="euro_ico
   }
 }
 #create_swarm()
-#create_swarm(prefix="../result/imp_onco/euro/euro",outprefix="euro_onco",nvar=2000,dataopt="onco")
-
 #cd swarm
-#each split into two files
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco1.swarm -g 9 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco2.swarm -g 9 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs_training1.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2
+# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs2.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2
 
-# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-# swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#create_swarm(prefix="../result/imp_onco/euro/euro",outprefix="euro_onco_training",nvar=2000,dataopt="onco")
+
+
+#each split into two files
+#15703279
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco_training1.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2
+#15703346
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco_training2.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2
+
 
 #asian
-#create_swarm(prefix="../result/imp_icogs/asian/asian",outprefix="asian_icogs",nvar=2000,dataopt="icogs",pop="asian")
-#create_swarm(prefix="../result/imp_onco/asian/asian",outprefix="asian_onco",nvar=2000,dataopt="onco",pop="asian")
+#create_swarm(prefix="../result/imp_icogs/asian/asian",outprefix="asian_icogs_training",nvar=2000,dataopt="icogs",pop="asian")
+#create_swarm(prefix="../result/imp_onco/asian/asian",outprefix="asian_onco_training",nvar=2000,dataopt="onco",pop="asian")
 #cd swarm
-#each split into two files
-#5250404
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#5250450
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
-#5967147
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5967201
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#15703432
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco_training1.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#15703617
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco_training2.swarm -g 8 --module R/4.3 --time=5-00:00:00 --gres=lscratch:8 -p 2
+#14764924
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs_training1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
+#14743515
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs_training2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
 
-#african
-#create_swarm(prefix="../result/imp_onco/african/african",outprefix="african_onco",nvar=2000,dataopt="onco",pop="african")
-#5721379
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco1.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5721410
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#5721447
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco3.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#create_swarm(prefix="../result/imp_icogs/african/african",outprefix="african_icogs",nvar=2000,dataopt="icogs",pop="african")
-#5994333
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_icogs1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
-#5979669
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_icogs2.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2
-#not run swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_icogs3.swarm -g 6 --module R/4.3 --time=5-00:00:00 --gres=lscratch:6 -p 2

@@ -120,8 +120,8 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro",swarm=c(4476647,44766
   return(res)
 }
 
-#use res.RData to check if a job is running 
-check_swarm=function(prefix="../result/imp_onco/euro/euro")
+#use res.RData to check if a job is running,prefix is for geno,inprefix is for result
+check_swarm=function(prefix="../result/imp_onco/euro/euro",inprefix="../result/imp_onco/euro/euro")
 {
   nvar=2000
   pvar=as.data.frame(fread(paste0(prefix,".pvar")))
@@ -137,7 +137,7 @@ check_swarm=function(prefix="../result/imp_onco/euro/euro")
   if (length(missingblocks)>0 ) warning(paste0(paste0(missingblocks,collapse = ",")," are missing"))
   
   currenttime=Sys.time()
-  resfolder=paste0(dirname(prefix),"/res/")
+  resfolder=paste0(dirname(inprefix),"/res/")
   res=data.frame(jobid=1:n,processed=0,ilast=0,running=0,finished=0,cantload=0)
   currenttime=Sys.time()
   for (i in 1:nrow(res))
@@ -202,6 +202,12 @@ asian_icogs=check_swarm(prefix="../result/imp_icogs/asian/asian")
 
 african_onco=check_swarm(prefix="../result/imp_onco/african/african")
 
+#for training samples
+euro_icogs_tr=check_swarm(prefix="../result/imp_icogs/euro/euro",inprefix="../result/training/imp_icogs/euro/euro")
+euro_onco_tr=check_swarm(prefix="../result/imp_onco/euro/euro",inprefix="../result/training/imp_onco/euro/euro")
+asian_icogs_tr=check_swarm(prefix="../result/imp_icogs/asian/asian",inprefix="../result/training/imp_icogs/asian/asian")
+asian_onco_tr=check_swarm(prefix="../result/imp_onco/asian/asian",inprefix="../result/training/imp_onco/asian/asian")
+
 resubmitjobs=function(dataopt="onco",pop="euro",swarmres=euro_onco)
 {
   #jobs not finished
@@ -240,3 +246,32 @@ resubmitjobs(pop="african",swarmres=african_onco)
 # swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_onco_new1.swarm -g 15 --module R/4.3 --time=5-00:00:00 --gres=lscratch:15 -p 2
 #6081953
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/african_onco_new1.swarm -g 10 --module R/4.3 --time=5-00:00:00 --gres=lscratch:10 -p 2
+
+resubmitjobs_training=function(dataopt="icogs",pop="euro",swarmres=euro_icogs_tr,opt="includelast")
+{
+  #jobs not finished
+  #idx=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed>0 & swarmres$processed %%20 ==0)
+  #idx=which(swarmres$finished==0 & swarmres$running==0 & swarmres$processed>0 & swarmres$processed<1975 & swarmres$jobid<nrow(swarmres))
+  if (opt=="includelast")
+  {
+    idx=which(swarmres$finished==0)
+  }else
+  {
+    #check the last one, to ignore it
+    idx=which(swarmres$finished==0 &swarmres$jobid<nrow(swarmres))
+  }
+  
+  if (length(idx)>0)
+  {
+    tmp=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/intrinsic_subtypes_genome_training.R",length(idx)),
+                   dataopt=dataopt,pop=pop,i1=swarmres$jobid[idx])
+    write.table(tmp,file=paste0(pop,"_",dataopt,"_training_new.swarm"),row.names = F,col.names = F,sep="\t",quote=F)
+  }
+  print(length(idx))
+}
+resubmitjobs_training(dataopt="icogs",pop="euro",swarmres=euro_icogs_tr)
+resubmitjobs_training(dataopt="icogs",pop="asian",swarmres=asian_icogs_tr,opt="notincludelast")
+#15580294,15705383
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs_training_new.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2
+#15580769,15705385
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs_training_new.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2

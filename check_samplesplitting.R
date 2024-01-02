@@ -54,6 +54,39 @@ table(idx,pheno_icogs0$EthnicityGeno)
 # FALSE    1639  9442    55958
 # TRUE      119  1380    11508
 
+# extract_tuningvalidation=function(pop="European")
+# {
+#   set.seed(123)
+#   ntotalcase=nrow(pheno_icogs0[which(pheno_icogs0$EthnicityGeno==pop & pheno_icogs0$Behaviour1==1),])+nrow(pheno_onco0[which(pheno_onco0$EthnicityGeno==pop & pheno_onco0$Behaviour1==1),])
+#   ntotalcontr=nrow(pheno_icogs0[which(pheno_icogs0$EthnicityGeno==pop & is.na(pheno_icogs0$Behaviour1)),])+nrow(pheno_onco0[which(pheno_onco0$EthnicityGeno==pop & is.na(pheno_onco0$Behaviour1)),])
+#   
+#   #number of cases/controls drawn for tuning/validation 
+#   ncase=as.integer(ntotalcase*0.3)
+#   ncontr=as.integer(ntotalcontr*0.3)
+#   
+#   pheno_onco1=pheno_onco0[which(pheno_onco0$EthnicityGeno==pop),]
+#   # complete cases
+#   idx=complete.cases(pheno_onco1[,c("Behaviour1","ER_status1","PR_status1","HER2_status1","Grade1")])
+#   pheno_onco2=pheno_onco1[idx,]
+#   
+#   #controls
+#   pheno_onco3=pheno_onco1[is.na(pheno_onco1$Behaviour1),]
+#   pheno_onco_tvcases=sample(1:nrow(pheno_onco2),ncase)
+#   pheno_onco_tvcases=pheno_onco2[pheno_onco_tvcases,]
+#   pheno_onco_tvcontrs=sample(1:nrow(pheno_onco3),ncontr)
+#   pheno_onco_tvcontrs=pheno_onco3[pheno_onco_tvcontrs,]
+#   n=as.integer(nrow(pheno_onco_tvcases)/2)
+#   pheno_onco_tuningcases=pheno_onco_tvcases[sample(1:nrow(pheno_onco_tvcases),n),]
+#   pheno_onco_validationcases=pheno_onco_tvcases[!pheno_onco_tvcases$Onc_ID %in% pheno_onco_tuningcases$Onc_ID,]
+#   n=as.integer(nrow(pheno_onco_tvcontrs)/2)
+#   pheno_onco_tuningcontrs=pheno_onco_tvcontrs[sample(1:nrow(pheno_onco_tvcontrs),n),]
+#   pheno_onco_validationcontrs=pheno_onco_tvcontrs[!pheno_onco_tvcontrs$Onc_ID %in% pheno_onco_tuningcontrs$Onc_ID,]
+#   pheno_onco_tuning=rbind(pheno_onco_tuningcases,pheno_onco_tuningcontrs)
+#   pheno_onco_validation=rbind(pheno_onco_validationcases,pheno_onco_validationcontrs)
+#   return(list(pheno_onco_tuning=pheno_onco_tuning,pheno_onco_validation=pheno_onco_validation))
+# }
+
+#without the requirement of complete cases (it is too aggressive)
 extract_tuningvalidation=function(pop="European")
 {
   set.seed(123)
@@ -65,13 +98,16 @@ extract_tuningvalidation=function(pop="European")
   ncontr=as.integer(ntotalcontr*0.3)
   
   pheno_onco1=pheno_onco0[which(pheno_onco0$EthnicityGeno==pop),]
-  #complete cases
-  idx=complete.cases(pheno_onco1[,c("Behaviour1","ER_status1","PR_status1","HER2_status1","Grade1")])
-  pheno_onco2=pheno_onco1[idx,]
+  # #complete cases
+  # idx=complete.cases(pheno_onco1[,c("Behaviour1","ER_status1","PR_status1","HER2_status1","Grade1")])
+  # pheno_onco2=pheno_onco1[idx,]
+  #cases
+  pheno_onco2=pheno_onco1[!is.na(pheno_onco1$Behaviour1),]
   #controls
   pheno_onco3=pheno_onco1[is.na(pheno_onco1$Behaviour1),]
   pheno_onco_tvcases=sample(1:nrow(pheno_onco2),ncase)
   pheno_onco_tvcases=pheno_onco2[pheno_onco_tvcases,]
+  
   pheno_onco_tvcontrs=sample(1:nrow(pheno_onco3),ncontr)
   pheno_onco_tvcontrs=pheno_onco3[pheno_onco_tvcontrs,]
   n=as.integer(nrow(pheno_onco_tvcases)/2)
@@ -243,12 +279,16 @@ get_table1=function(dat1=tuning[tuning$EthnicityGeno=="European",])
 table_EURtraining=get_table2()
 #  nctr ncase lumA lumB LumB_HN HER2E TripN Unknown
 # 60204 69111 8783 2452    2208  1069  3520   51079
+# nctr ncase  lumA lumB LumB_HN HER2E TripN Unknown
+# 1 60204 69111 17048 3913    4311  1722  4945   37172
 table_EURtraining_icogs=get_table1(dat1=training_icogs[training_icogs$EthnicityGeno=="European",])
 #  nctr ncase lumA lumB LumB_HN HER2E TripN Unknown
 # 33505 33961 7031 1417    1720   722  2393   20678
 table_EURtraining_onco=get_table1(dat1=training_onco[training_onco$EthnicityGeno=="European",])
 #  nctr ncase lumA lumB LumB_HN HER2E TripN Unknown
 # 26699 35150 1752 1035     488   347  1127   30401
+# nctr ncase  lumA lumB LumB_HN HER2E TripN Unknown
+# 1 26699 35150 10017 2496    2591  1000  2552   16494
 table_EURtuning=get_table1()
 table_EURvalidation=get_table1(dat1=validation_onco[validation_onco$EthnicityGeno=="European",])
 

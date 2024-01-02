@@ -228,3 +228,28 @@ runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro euro
 runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/merged1 merged1
 runPCA /data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/merged1 merged1
 
+#merge the whole datasets to get PCs
+$plink2 --pfile ../result/imp_onco/merged1_MAF05 --make-bed --out /data/DCEGLeiSongData/Kevin/tmp/onco_MAF05 --memory 200000 --threads 10
+$plink2 --pfile ../result/imp_icogs/merged1_MAF05 --make-bed --out /data/DCEGLeiSongData/Kevin/tmp/icogs_MAF05 --memory 200000 --threads 10
+echo "/data/DCEGLeiSongData/Kevin/tmp/onco_MAF05"> /data/DCEGLeiSongData/Kevin/tmp/BCACmergelist.txt
+echo "/data/DCEGLeiSongData/Kevin/tmp/icogs_MAF05">> /data/DCEGLeiSongData/Kevin/tmp/BCACmergelist.txt
+$plink --merge-list /data/DCEGLeiSongData/Kevin/tmp/BCACmergelist.txt --geno 0.05 --make-bed --out /data/DCEGLeiSongData/Kevin/tmp/BCAC --memory 20000 --threads 5
+$plink2 \
+    --bfile /data/DCEGLeiSongData/Kevin/tmp/BCAC \
+    --indep-pairwise 1000 50 0.05 \
+    --exclude range /data/BB_Bioinformatics/Kevin/tools/other/exclusion_regions_hg38.txt\
+    --threads 12\
+    --memory 20000\
+    --out /data/DCEGLeiSongData/Kevin/tmp/BCAC
+$plink2 \
+  --bfile /data/DCEGLeiSongData/Kevin/tmp/BCAC \
+  --extract /data/DCEGLeiSongData/Kevin/tmp/BCAC.prune.in \
+  -threads 12\
+  --memory 20000\
+  --make-bed --out /data/DCEGLeiSongData/Kevin/tmp/BCAC_pruned 
+$plink2 \
+    --bfile /data/DCEGLeiSongData/Kevin/tmp/BCAC_pruned \
+    --pca 10 \
+    --threads 40\
+    --memory 400000\
+    --out ../result/BCAC
