@@ -275,3 +275,6 @@ resubmitjobs_training(dataopt="icogs",pop="asian",swarmres=asian_icogs_tr,opt="n
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_icogs_training_new.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2
 #15580769,15705385
 #swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/asian_icogs_training_new.swarm -g 16 --module R/4.3 --time=5-00:00:00 --gres=lscratch:16 -p 2
+resubmitjobs_training(dataopt="onco",pop="euro",swarmres=euro_onco_tr,opt="notincludelast")
+#16595787
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/euro_onco_training_new.swarm -g 16 --module R/4.3 --time=10-00:00:00 --gres=lscratch:16 -p 2

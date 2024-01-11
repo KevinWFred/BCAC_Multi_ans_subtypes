@@ -2,7 +2,7 @@
 
 .libPaths(c("/data/wangx53",.libPaths()))
 library(data.table)
-
+library(dplyr)
 plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
 plink2="/usr/local/apps/plink/2.3-alpha/plink2"
 
@@ -67,6 +67,7 @@ addrsid=function(sumfile="../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid")
   dat=as.data.frame(fread(sumfile))
   colnames(dat)[which(colnames(dat)=="#CHROM")]="CHR"
   dat=dat[!is.na(dat$P),]
+  colnames(dat)[which(colnames(dat)=="BP")]="POS"
   positions <- GPos(seqnames = dat$CHR, pos = dat$POS)
   all_snps <- SNPlocs.Hsapiens.dbSNP155.GRCh38
   ## query the genome with positions
@@ -141,6 +142,67 @@ runmeta=function(sumfiles=c("../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid
 }
 runmeta()
 metares=as.data.frame(fread("../result/meta_lr.meta"))
+runmeta(sumfiles=c("../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid.rsid",
+                   "../result/GWAS_onco_euro.pheno.glm.logistic.hybrid.rsid"),
+        outprefix="../result/meta_euro_lr")
+runmeta(sumfiles=c("../result/GWAS_icogs_asian.pheno.glm.logistic.hybrid.rsid",
+                   "../result/GWAS_onco_asian.pheno.glm.logistic.hybrid.rsid"),
+        outprefix="../result/meta_asian_lr")
+addrsid_meta=function(sumfile="../result/meta_euro_lr.meta")
+{
+  print(sumfile)
+  dat=as.data.frame(fread(sumfile))
+  colnames(dat)[which(colnames(dat)=="#CHROM")]="CHR"
+  dat=dat[!is.na(dat$P),]
+  colnames(dat)[which(colnames(dat)=="BP")]="POS"
+  positions <- GPos(seqnames = dat$CHR, pos = dat$POS)
+  all_snps <- SNPlocs.Hsapiens.dbSNP155.GRCh38
+  ## query the genome with positions
+  my_snps <- snpsByOverlaps(all_snps, positions, genome = BSgenome.Hsapiens.UCSC.hg38)
+  
+  ## this gives us a GPos object
+  my_snps = as.data.frame(my_snps)
+  my_snps$alt_alleles=as.character(my_snps$alt_alleles)
+  dat_chrpos=paste0(dat$CHR,":",dat$POS)
+  my_snps_chrpos=paste0(my_snps$seqnames,":",my_snps$pos)
+  if (sum(duplicated(my_snps_chrpos))>0) warnings("duplicated rsid for the same position")
+  idx = match(dat_chrpos,my_snps_chrpos)
+  dat$rsid=my_snps$RefSNP_id[idx]
+  idx1=which(duplicated(dat$rsid) & !is.na(dat$rsid))
+  idx1=which(dat$rsid %in% dat$rsid[idx1]) #these have duplicated rsid
+  dat1=dat[idx1,]
+  #pick the one with smaller pvalue
+  dat2=dat1 %>% group_by(rsid) %>% arrange(P) %>% filter(row_number()==1)
+  dat$rsid[idx1]=NA
+  idx2=match(dat2$SNP,dat$SNP)
+  dat$rsid[idx2]=dat2$rsid
+  # for (i in 1:length(idx1))
+  # {
+  #   idx2=which(my_snps_chrpos==dat_chrpos[idx1[i]])
+  #   #if (length(idx2)>1) stop("multiple hits!")
+  #   alt=unlist(strsplit(my_snps$alt_alleles[idx2],","))
+  #   str1=paste0(my_snps$seqnames[idx2],":",my_snps$pos[idx2],":",my_snps$ref_allele[idx2],":",alt)
+  #   str2=paste0(my_snps$seqnames[idx2],":",my_snps$pos[idx2],":",alt,":",my_snps$ref_allele[idx2])
+  #   if (gsub("chr","",dat$SNP[idx1[i]]) %in% c(str1,str2))
+  #   {
+  #     dat$rsid[idx1[i]]=my_snps$RefSNP_id[idx2]
+  #   }
+  # }
+  print(paste0("there are ",sum(is.na(dat$rsid))/nrow(dat)," variants without rsid"))
+  tmp=dat[order(dat$P),]
+  tmp1=sum(is.na(tmp$rsid[1:100]))
+  if (tmp1>0) print(paste0("there are ",tmp1," variant without rsid in top 100"))
+  tmp2=tmp$P[is.na(tmp$rsid)][1]
+  print(paste0("SNPs with NA rsid has min p value of",tmp2))
+  #dat=as.data.frame(fread(paste0(sumfile,".rsid")))
+  idx=which(colnames(dat)=="POS")
+  if (length(idx)==0) stop("no pos")
+  colnames(dat)[idx]="BP"
+  write.table(dat,file=paste0(sumfile,".rsid"),row.names=F,sep="\t",quote=F)
+  #return(dat)
+}
+addrsid_meta(sumfile="../result/meta_euro_lr.meta")
+addrsid_meta(sumfile="../result/meta_asian_lr.meta")
 #previous results
 load("../result/compute_metapvalues_new.RData")
 tmp=intersect(names(allpvalues),metares$SNP)

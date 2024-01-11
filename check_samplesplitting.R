@@ -150,6 +150,15 @@ write.table(training_icogs,file="../result/PRS_icogs_trainingpheno.txt",row.name
 write.table(training_onco,file="../result/PRS_onco_trainingpheno.txt",row.names = F,sep="\t",quote = F)
 nrow(training_icogs)+nrow(training_onco)+nrow(tuning)+nrow(validation_icogs)+nrow(validation_onco)==nrow(pheno_icogs0)+nrow(pheno_onco0)
 
+write.table(tuning[tuning$EthnicityGeno=="European",],file="../result/PRS_onco_euro_tuningpheno.txt",row.names = F,sep="\t",quote = F)
+write.table(tuning[tuning$EthnicityGeno=="Asian",],file="../result/PRS_onco_asian_tuningpheno.txt",row.names = F,sep="\t",quote = F)
+
+write.table(validation_icogs[validation_icogs$EthnicityGeno=="African",],file="../result/PRS_icogs_african_validationpheno.txt",row.names = F,sep="\t",quote = F)
+write.table(validation_onco[validation_onco$EthnicityGeno=="African",],file="../result/PRS_onco_african_validationpheno.txt",row.names = F,sep="\t",quote = F)
+write.table(validation_onco[validation_onco$EthnicityGeno=="Asian",],file="../result/PRS_onco_asian_validationpheno.txt",row.names = F,sep="\t",quote = F)
+write.table(validation_onco[validation_onco$EthnicityGeno=="European",],file="../result/PRS_onco_euro_validationpheno.txt",row.names = F,sep="\t",quote = F)
+write.table(validation_onco[validation_onco$EthnicityGeno=="other",],file="../result/PRS_onco_other_validationpheno.txt",row.names = F,sep="\t",quote = F)
+
 nrow(training_icogs[which(training_icogs$Behaviour1==1),])+nrow(training_onco[which(training_onco$Behaviour1==1),]) #81538
 nrow(training_icogs[which(is.na(training_icogs$Behaviour1)),])+nrow(training_onco[which(is.na(training_onco$Behaviour1)),]) #73003
 
