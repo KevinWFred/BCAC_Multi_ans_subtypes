@@ -58,36 +58,48 @@ readres=function(pop="euro",dataopt="onco",nvar=2000)
 # asian_icogs=readres(pop="asian",dataopt="icogs",nvar=2000)
 # african_onco=readres(pop="african",dataopt="onco",nvar=2000)
 
-#read and combine the score/infor
+# #QCed SNP lists:
+qc_african_onco=as.data.frame(fread("../result/imp_QC/onco/african_info.snplist",header=F))
+qc_asian_onco=as.data.frame(fread("../result/imp_QC/onco/asian_info.snplist",header=F))
+qc_euro_onco=as.data.frame(fread("../result/imp_QC/onco/euro_info.snplist",header=F))
+#qc_hispanic_onco=as.data.frame(fread("../result/imp_QC/onco/hispanic_info.snplist",header=F))
+#qc_african_icogs=as.data.frame(fread("../result/imp_QC/icogs/african_info.snplist",header=F))
+qc_asian_icogs=as.data.frame(fread("../result/imp_QC/icogs/asian_info.snplist",header=F))
+qc_euro_icogs=as.data.frame(fread("../result/imp_QC/icogs/euro_info.snplist",header=F))
+
+# #read and combine the score/infor
+filter_qcsnps=function(dat=euro_onco,qcdat=qc_euro_onco)
+{
+  #remove those SNPs with 0 scores (MAF<0.006)
+  tmp=rowSums(abs(dat$score),na.rm=T)
+  idx=tmp!=0
+  dat$freq=dat$freq[idx]
+  dat$score=dat$score[idx,]
+  dat$infor=dat$infor[idx,]
+  dat$freq=dat$freq[names(dat$freq) %in% qcdat[,1]]
+  dat$score=dat$score[rownames(dat$score) %in% qcdat[,1],]
+  dat$infor=dat$infor[rownames(dat$infor) %in% qcdat[,1],]
+  return(dat)
+}
 load(paste0("../result/imp_","onco","/","euro","/scoretest/scoreinfor.RData"))
-euro_onco=res
+euro_onco=filter_qcsnps(dat=res,qcdat=qc_euro_onco)
 rm(res)
 load(paste0("../result/imp_","icogs","/","euro","/scoretest/scoreinfor.RData"))
-euro_icogs=res
+euro_icogs=filter_qcsnps(dat=res,qcdat=qc_euro_icogs)
 rm(res)
 load(paste0("../result/imp_","onco","/","asian","/scoretest/scoreinfor.RData"))
-asian_onco=res
+asian_onco=filter_qcsnps(dat=res,qcdat=qc_asian_onco)
 rm(res)
 load(paste0("../result/imp_","icogs","/","asian","/scoretest/scoreinfor.RData"))
-asian_icogs=res
+asian_icogs=filter_qcsnps(dat=res,qcdat=qc_asian_icogs)
 rm(res)
 load(paste0("../result/imp_","onco","/","african","/scoretest/scoreinfor.RData"))
-african_onco=res
+african_onco=filter_qcsnps(dat=res,qcdat=qc_african_onco)
 rm(res)
-#first time opt="new", then opt="add". keep availability of variants in each data
+# #first time opt="new", then opt="add". keep availability of variants in each data
 aggregate_scoreinfor=function(res1=euro_onco,
-                              res2=euro_icogs,n.second=5,opt="new",oldavail=NULL)
+                              res2=euro_icogs,n.second=5,opt="new")
 {
-  #restrict to SNPs with allele frequency more than 0.006
-  idx=which(res1$freq>0.006 & res1$freq < 0.994)
-  res1$score=res1$score[idx,]
-  res1$infor=res1$infor[idx,]
-  res1$freq=res1$freq[idx]
-  idx=which(res2$freq>0.006 & res2$freq < 0.994)
-  res2$score=res2$score[idx,]
-  res2$infor=res2$infor[idx,]
-  res2$freq=res2$freq[idx]
-
   allvar=unique(c(rownames(res1$score),rownames(res2$score)))
   print(length(allvar))
   var1=rownames(res1$score)
@@ -116,7 +128,7 @@ aggregate_scoreinfor=function(res1=euro_onco,
   idx3=match(var12,allvar)
   idx4=match(var12,names(res1$freq))
   idx5=match(var12,names(res2$freq))
-  freq[idx3]=pmin(res1$freq[idx4],res2$freq[idx5])
+  freq[idx3]=pmin(res1$freq[idx4],res2$freq[idx5]) #freq is the minfreq
   maxfreq[idx3]=pmax(res1$freq[idx4],res2$freq[idx5])
   if (opt=="new")
   {
@@ -124,33 +136,47 @@ aggregate_scoreinfor=function(res1=euro_onco,
     rownames(avail)=allvar
     avail[idx1,1]=1
     avail[idx2,2]=1
+    allfreq=data.frame(matrix(NA,nrow=length(allvar),ncol=2))
+    rownames(allfreq)=allvar
+    allfreq[idx1,1]=res1$freq
+    allfreq[idx2,2]=res2$freq
   }else
   {
-    avail=data.frame(matrix(0,nrow=length(allvar),ncol=ncol(oldavail)+1))
+    avail=data.frame(matrix(0,nrow=length(allvar),ncol=ncol(res1$avail)+1))
     rownames(avail)=allvar
-    avail[idx1,1:ncol(oldavail)]=oldavail
+    avail[idx1,1:ncol(res1$avail)]=res1$avail
     avail[idx2,ncol(avail)]=1
+    allfreq=data.frame(matrix(NA,nrow=length(allvar),ncol=ncol(res1$allfreq)+1))
+    rownames(allfreq)=allvar
+    allfreq[idx1,1:ncol(res1$allfreq)]=res1$allfreq
+    allfreq[idx2,ncol(allfreq)]=res2$freq
   }
-  return(list(score=score,infor=infor,freq=freq,maxfreq=maxfreq,avail=avail))
+  return(list(score=score,infor=infor,freq=freq,maxfreq=maxfreq,allfreq=allfreq,avail=avail))
 }
 #
 metascoreinfo1=aggregate_scoreinfor()
 metascoreinfo2=aggregate_scoreinfor(res1=metascoreinfo1,res2=asian_icogs,
-                                    opt="add",oldavail=metascoreinfo1$avail)
+                                    opt="add")
 metascoreinfo3=aggregate_scoreinfor(res1=metascoreinfo2,res2=asian_onco,
-                                    opt="add",oldavail=metascoreinfo2$avail)
+                                    opt="add")
 metascoreinfo4=aggregate_scoreinfor(res1=metascoreinfo3,res2=african_onco,
-                                    opt="add",oldavail=metascoreinfo3$avail)
-# calculate the p-value for based on score statistics and information matrix
-# to perform fixed-effect test using chi-square test
-# we can use function ScoreGlobalTestForAssoc(score, infor)
-# to perform random-effect test using mixture chi-square test
-# we can use function ScoreMixedGlobalTestForHeter(score, infor)
-# table(metascoreinfo4$freq>0.01 & metascoreinfo4$freq<0.99)
-# FALSE     TRUE
-# 3870641 14994842
-save(metascoreinfo4,file="../result/metascoreinfo4_new.RData") #new is the one remove MAF<0.006
-load("../result/metascoreinfo4_new.RData")
+                                    opt="add")
+colnames(metascoreinfo4$allfreq)=c("euro_onco","euro_icogs","asian_icogs","asian_onco","african_onco")
+colnames(metascoreinfo4$avail)=c("euro_onco","euro_icogs","asian_icogs","asian_onco","african_onco")
+tmp=apply(metascoreinfo4$allfreq, 1, min, na.rm=TRUE)
+table(tmp==metascoreinfo4$freq) #T
+#maxfreq is not accurate
+metascoreinfo4$maxfreq=apply(metascoreinfo4$allfreq, 1, max, na.rm=TRUE)
+# # calculate the p-value for based on score statistics and information matrix
+# # to perform fixed-effect test using chi-square test
+# # we can use function ScoreGlobalTestForAssoc(score, infor)
+# # to perform random-effect test using mixture chi-square test
+# # we can use function ScoreMixedGlobalTestForHeter(score, infor)
+# # table(metascoreinfo4$freq>0.01 & metascoreinfo4$freq<0.99)
+# # FALSE     TRUE
+# # 4884330 16470317
+# save(metascoreinfo4,file="../result/metascoreinfo4_newQC.RData") #new is the one remove MAF<0.006,newQC is the one using QC SNPs
+load("../result/metascoreinfo4_newQC.RData")
 
 #compute p-values based on score and infor
 Pfunction <- function(score=metascoreinfo4$score[1,],infor=metascoreinfo4$infor[1,],second.num=5){
@@ -205,20 +231,20 @@ for(j in start:end){
 
 
 #save the pvalue_sub file to a folder
-save(pvalue_sub,file=paste0("../result/scoretestresult/p_value_sub",i1,".RData"))
+save(pvalue_sub,file=paste0("../result/scoretestresult/QCp_value_sub",i1,".RData"))
 
 print(Sys.time())
 print("done")
 
 createswarm=function()
 {
-  swarmjobs=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/compute_pvalues_scoretest.R",1000),
+  swarmjobs=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/compute_pvalues_scoretest_QC.R",1000),
                        i1=1:1000)
-  write.table(swarmjobs,file=paste0("compute_scoretest_pvalues.swam"),row.names=F,col.names=F,sep="\t",quote=F)
+  write.table(swarmjobs,file=paste0("compute_scoretest_pvalues_QC.swam"),row.names=F,col.names=F,sep="\t",quote=F)
 }
 #createswarm()
-#9226087
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/compute_scoretest_pvalues.swam -g 30 --module R/4.3 --partition=quick --time=4:00:00 --gres=lscratch:30 -p 2
+#17225024
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/compute_scoretest_pvalues_QC.swam -g 32 --module R/4.3 --partition=quick --time=4:00:00 --gres=lscratch:30 -p 2
 
 #collect all the results
 allpvalues=NULL
@@ -226,10 +252,10 @@ for (i1 in 1:1000)
 {
   if (i1 %% 100==0) cat(i1,'..')
 #   load(paste0("../result/scoretestresult/p_value_sub",i1,".Rdata"))
-  load(paste0("../result/scoretestresult/p_value_sub",i1,".RData"))
+  load(paste0("../result/scoretestresult/QCp_value_sub",i1,".RData"))
   allpvalues=c(allpvalues,pvalue_sub)
 }
-save(allpvalues,file="../result/scoretestresult/allpvalues.Rdata")
+save(allpvalues,file="../result/scoretestresult/QCallpvalues.Rdata")
 # 
 # #qqplot and manhattan plot
 # #draw plots
@@ -458,12 +484,12 @@ save(allpvalues,file="../result/scoretestresult/allpvalues.Rdata")
 #          plot=manhplot, device="png",
 #          width=9, height=4, units="in", dpi=300)
 # }
-# load("../result/scoretestresult/allpvalues.Rdata")
-idx=match(names(allpvalues),rownames(metascoreinfo4$score))
-metascoreinfo4$score=metascoreinfo4$score[idx,]
-metascoreinfo4$infor=metascoreinfo4$infor[idx,]
-metascoreinfo4$freq=metascoreinfo4$freq[idx]
-metascoreinfo4$avail=metascoreinfo4$avail[idx,]
+# load("../result/scoretestresult/QCallpvalues.Rdata")
+# idx=match(names(allpvalues),rownames(metascoreinfo4$score))
+# metascoreinfo4$score=metascoreinfo4$score[idx,]
+# metascoreinfo4$infor=metascoreinfo4$infor[idx,]
+# metascoreinfo4$freq=metascoreinfo4$freq[idx]
+# metascoreinfo4$avail=metascoreinfo4$avail[idx,]
 # all(names(metascoreinfo4$freq)==names(allpvalues)) #T
 # idx=which(is.na(metascoreinfo4$freq))
 # quantile(allpvalues[idx])

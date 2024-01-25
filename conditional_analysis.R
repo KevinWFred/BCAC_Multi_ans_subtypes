@@ -130,7 +130,6 @@ EMmvpolySelfDesign=function (y, x.self.design, z.design, baselineonly = NULL, ad
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 print(paste0("host:",as.character(Sys.info()["nodename"])))
 set.seed(123)
-allnovelsnps1=read.table("../result/allnovelsnps1.txt",header=T)
 
 twotests_fun=function(dataopt="icogs",pop="euro",i1=1)
 {
@@ -479,19 +478,46 @@ ScoreMetaAnalysis <- function(score=score.meta,infor=infor.meta,second.num=5){
 
 args <- commandArgs(trailingOnly=T)
 i1=as.numeric(args[1])
+snpfile=args[2] #"../result/QCallnovelsnps1.txt"
+outprefix=args[3] #"QC"
+
+allnovelsnps1=read.table(snpfile,header=T)
+
+#QCed SNP lists:
+qc_african_onco=as.data.frame(fread("../result/imp_QC/onco/african_info.snplist",header=F))
+qc_asian_onco=as.data.frame(fread("../result/imp_QC/onco/asian_info.snplist",header=F))
+qc_euro_onco=as.data.frame(fread("../result/imp_QC/onco/euro_info.snplist",header=F))
+qc_asian_icogs=as.data.frame(fread("../result/imp_QC/icogs/asian_info.snplist",header=F))
+qc_euro_icogs=as.data.frame(fread("../result/imp_QC/icogs/euro_info.snplist",header=F))
+table(allnovelsnps1$ID %in% qc_african_onco$V1) #F1
+table(allnovelsnps1$ID %in% qc_asian_onco$V1) #F4
+table(allnovelsnps1$ID %in% qc_euro_onco$V1) #F0
+table(allnovelsnps1$ID %in% qc_asian_icogs$V1) #F5
+table(allnovelsnps1$ID %in% qc_euro_icogs$V1) #F1 
+
 res=data.frame(snp=allnovelsnps1$ID[i1],scoreP=NA,intrinsicP=NA,acatP=NA,euro_icogs_intr=NA,euro_onco_intr=NA,asian_icogs_intr=NA,asian_onco_intr=NA,african_onco_intr=NA,
                euro_icogs_score=NA,euro_onco_score=NA,asian_icogs_score=NA,asian_onco_score=NA,african_onco_score=NA)
-outfile=paste0("../result/conditional_result",i1,".txt")
+outfile=paste0("../result/",outprefix,"conditional_result",i1,".txt")
 #this is the result to remove the conditional snp: #allcov=c(allcov,"condsnp")
 #outfile=paste0("../result/noconditional_result",i1,".txt")
 #for (i1 in 1:nrow(allnovelsnps1))
 #{
   print(i1)
-  twotests_euro_icogs=twotests_fun(dataopt="icogs",pop="euro",i1=i1)
-  twotests_euro_onco=twotests_fun(dataopt="onco",pop="euro",i1=i1)
-  twotests_asian_icogs=twotests_fun(dataopt="icogs",pop="asian",i1=i1)
-  twotests_asian_onco=twotests_fun(dataopt="onco",pop="asian",i1=i1)
-  twotests_african_onco=twotests_fun(dataopt="onco",pop="african",i1=i1)
+  twotests_euro_icogs=NULL
+  if (allnovelsnps1$ID[i1] %in% qc_euro_icogs[,1])
+    twotests_euro_icogs=twotests_fun(dataopt="icogs",pop="euro",i1=i1)
+  twotests_euro_onco=NULL
+  if (allnovelsnps1$ID[i1] %in% qc_euro_onco[,1])
+    twotests_euro_onco=twotests_fun(dataopt="onco",pop="euro",i1=i1)
+  twotests_asian_icogs=NULL
+  if (allnovelsnps1$ID[i1] %in% qc_asian_icogs[,1])
+    twotests_asian_icogs=twotests_fun(dataopt="icogs",pop="asian",i1=i1)
+  twotests_asian_onco=NULL
+  if (allnovelsnps1$ID[i1] %in% qc_asian_onco[,1])
+    twotests_asian_onco=twotests_fun(dataopt="onco",pop="asian",i1=i1)
+  twotests_african_onco=NULL
+  if (allnovelsnps1$ID[i1] %in% qc_african_onco[,1])
+    twotests_african_onco=twotests_fun(dataopt="onco",pop="african",i1=i1)
   
   logoddslist=sigmalist=list()
   score.meta=data.frame(matrix(0,nrow=1,ncol=5))
@@ -577,25 +603,42 @@ outfile=paste0("../result/conditional_result",i1,".txt")
 
 write.table(res,file=outfile,row.names=F,sep="\t",quote=F)
 print(Sys.time())
-# tmp=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.R",i1=1:nrow(allnovelsnps1))
-# write.table(tmp,file="conditional_analysis.swarm",row.names = F,col.names = F,sep=" ",quote=F)
-#11909056,11909662
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis.swarm -g 32 --module R/4.3 --time=04:00:00 --gres=lscratch:32
+tmp1=read.table("../result/QCallnovelsnps1.txt",header=T)
+tmp=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis_QC.R",i1=1:nrow(tmp1),snpfile="../result/QCallnovelsnps1.txt",outprefix="QC")
+# write.table(tmp,file="conditional_analysis_QC.swarm",row.names = F,col.names = F,sep=" ",quote=F)
+#17689872
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis_QC.swarm -g 32 --module R/4.3 --time=08:00:00 --gres=lscratch:32
+
+tmp1=read.table("../result/QCfreq01allnovelsnps1.txt",header=T)
+tmp=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis_QC.R",i1=1:nrow(tmp1),snpfile="../result/QCfreq01allnovelsnps1.txt",outprefix="QCfreq01")
+#write.table(tmp,file="conditional_analysis_QCfreq01.swarm",row.names = F,col.names = F,sep=" ",quote=F)
+#17689880
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/conditional_analysis_QCfreq01.swarm -g 32 --module R/4.3 --time=08:00:00 --gres=lscratch:32
+
 
 #read results
-allres=NULL
-for(i in 1:nrow(allnovelsnps1))
+read_results=function(snpfile="../result/QCallnovelsnps1.txt",outprefix="QC")
 {
-  outfile=paste0("../result/conditional_result",i,".txt")
-  tmp=read.table(outfile,header=T)
-  allres=rbind(allres,tmp)
+  allnovelsnps1=read.table(snpfile,header=T)
+  allres=NULL
+  for(i in 1:nrow(allnovelsnps1))
+  {
+    outfile=paste0("../result/",outprefix,"conditional_result",i,".txt")
+    tmp=read.table(outfile,header=T)
+    allres=rbind(allres,tmp)
+  }
+  idx=match(allres$snp,allnovelsnps1$ID)
+  allres$freq=allnovelsnps1$freq[idx]
+  print(table(allres$acatP<1e-6))
+  # FALSE  TRUE
+  # 2     7
+  allres1=allnovelsnps1[,c("ID","rsid","dist2nearestknown1","knownvar_rsid")]
+  idx=match(allres1$ID,allres$snp)
+  allres1=cbind(allres1,allres[idx,2:4])
+  write.csv(allres1,file=paste0("../result/",outprefix,"conditional_analysis_res.csv"),row.names = F,quote=T)
+  
 }
-idx=match(allres$snp,allnovelsnps1$ID)
-allres$freq=allnovelsnps1$freq[idx]
-table(allres$acatP<1e-6)
-# FALSE  TRUE
+read_results(snpfile="../result/QCallnovelsnps1.txt",outprefix="QC")
+read_results(snpfile="../result/QCfreq01allnovelsnps1.txt",outprefix="QCfreq01")
+# FALSE  TRUE 
 # 2     4
-allres1=allnovelsnps1[,c("ID","rsid","dist2nearestknown1","knownvar_rsid")]
-idx=match(allres1$ID,allres$snp)
-allres1=cbind(allres1,allres[idx,2:4])
-write.csv(allres1,file="../result/conditional_analysis_res.csv",row.names = F,quote=T)
