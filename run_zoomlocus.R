@@ -62,8 +62,9 @@ get_zoomlocus=function(snpfile="../result/QCfreq01allcandidatenovelsnps.csv",
   if (idx==3) pop="african"
   
   outprefix1=paste0("../result/zoomlocus/",outprefix,"_Snp",snpid,"_",pop)
-  myallpvalues=get(paste0("collect_pvalues_",pop))
-  myallpvalues=myallpvalues$acatpvalues
+  #myallpvalues=get(paste0("collect_pvalues_",pop))
+  #myallpvalues=myallpvalues$acatpvalues
+  myallpvalues=allpvalues
   tmp=unlist(strsplit(names(myallpvalues),":"))
   mychr=tmp[seq(1,length(tmp),4)]
   mychr=gsub("chr","",mychr)
