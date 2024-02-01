@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-
+#based on qced snps
 .libPaths(c("/data/wangx53",.libPaths()))
 library(data.table)
 library(dplyr)
@@ -25,7 +25,7 @@ onco_samples=read.table(onco_samplefile)
 all(training_onco$Onc_ID %in% onco_samples$V1)
 
 rungwas=function(phenodat=training_icogs[training_icogs$EthnicityGeno=="European",],
-                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/euro/euro",
+                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_QC/icogs/euro/euro",
                  outprefix="../result/GWAS_icogs_euro")
 {
   
@@ -44,24 +44,24 @@ rungwas=function(phenodat=training_icogs[training_icogs$EthnicityGeno=="European
   tmp=data.frame(FID=phenodat$ID,IID=phenodat$ID,case=as.integer(!is.na(phenodat$Behaviour1))+1)
   phenofile=paste0(outprefix,".pheno")
   write.table(tmp,file=phenofile,row.names = F,quote=F,sep=" ")
-  
-  cmd=paste0(plink2," --pfile ",genoprefix," --keep ",samplefile," --pheno ",phenofile," --covar ",covfile," --logistic hide-covar --ci 0.95 --out ",outprefix," --threads 8 --memory 64000 --covar-variance-standardize")
+  #--no-pheno ignore phenotype in fam
+  cmd=paste0(plink2," --pfile ",genoprefix," --keep ",samplefile," --pheno ",phenofile," --no-pheno --covar ",covfile," --logistic hide-covar --ci 0.95 --out ",outprefix," --threads 20 --memory 128000 --covar-variance-standardize")
   system(cmd)
 }
 rungwas()
 rungwas(phenodat=training_icogs[training_icogs$EthnicityGeno=="Asian",],
-                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_icogs/asian/asian",
+                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_QC/icogs/asian/asian",
                  outprefix="../result/GWAS_icogs_asian")
 rungwas(phenodat=training_onco[training_onco$EthnicityGeno=="European",],
-                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/euro/euro",
+                 genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_QC/onco/euro/euro",
                  outprefix="../result/GWAS_onco_euro")
 rungwas(phenodat=training_onco[training_onco$EthnicityGeno=="Asian",],
-        genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_onco/asian/asian",
+        genoprefix="/data/BB_Bioinformatics/Kevin/BCAC/result/imp_QC/onco/asian/asian",
         outprefix="../result/GWAS_onco_asian")
 
 library(BSgenome.Hsapiens.UCSC.hg38)
 library(SNPlocs.Hsapiens.dbSNP155.GRCh38)
-addrsid=function(sumfile="../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid")
+addrsid=function(sumfile="../result/GWAS_icogs_euro.case.glm.logistic.hybrid")
 {
   print(sumfile)
   dat=as.data.frame(fread(sumfile))
@@ -98,18 +98,18 @@ addrsid=function(sumfile="../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid")
   #return(dat)
 }
 
-addrsid(sumfile="../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid")
-addrsid(sumfile="../result/GWAS_onco_euro.pheno.glm.logistic.hybrid")
-addrsid(sumfile="../result/GWAS_icogs_asian.pheno.glm.logistic.hybrid")
-addrsid(sumfile="../result/GWAS_onco_asian.pheno.glm.logistic.hybrid")
+addrsid(sumfile="../result/GWAS_icogs_euro.case.glm.logistic.hybrid")
+addrsid(sumfile="../result/GWAS_onco_euro.case.glm.logistic.hybrid")
+addrsid(sumfile="../result/GWAS_icogs_asian.case.glm.logistic.hybrid")
+addrsid(sumfile="../result/GWAS_onco_asian.case.glm.logistic.hybrid")
 
-runmeta=function(sumfiles=c("../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid.rsid",
-                            "../result/GWAS_icogs_asian.pheno.glm.logistic.hybrid.rsid",
-                            "../result/GWAS_onco_euro.pheno.glm.logistic.hybrid.rsid",
-                            "../result/GWAS_onco_asian.pheno.glm.logistic.hybrid.rsid"),
+runmeta=function(sumfiles=c("../result/GWAS_icogs_euro.case.glm.logistic.hybrid.rsid",
+                            "../result/GWAS_icogs_asian.case.glm.logistic.hybrid.rsid",
+                            "../result/GWAS_onco_euro.case.glm.logistic.hybrid.rsid",
+                            "../result/GWAS_onco_asian.case.glm.logistic.hybrid.rsid"),
                  outprefix="../result/meta_lr")
 {
-  cmd=paste0(plink," --meta-analysis ",paste0(sumfiles,collapse = " ")," + report-all --threads 8 --memory 100000 --out ",outprefix)
+  cmd=paste0(plink," --meta-analysis ",paste0(sumfiles,collapse = " ")," + report-all --threads 20 --memory 128000 --out ",outprefix)
   system(cmd)
   metares=as.data.frame(fread(paste0(outprefix,".meta"))) 
   metares=metares[!is.na(metares$SNP),]
@@ -142,11 +142,11 @@ runmeta=function(sumfiles=c("../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid
 }
 runmeta()
 metares=as.data.frame(fread("../result/meta_lr.meta"))
-runmeta(sumfiles=c("../result/GWAS_icogs_euro.pheno.glm.logistic.hybrid.rsid",
-                   "../result/GWAS_onco_euro.pheno.glm.logistic.hybrid.rsid"),
+runmeta(sumfiles=c("../result/GWAS_icogs_euro.case.glm.logistic.hybrid.rsid",
+                   "../result/GWAS_onco_euro.case.glm.logistic.hybrid.rsid"),
         outprefix="../result/meta_euro_lr")
-runmeta(sumfiles=c("../result/GWAS_icogs_asian.pheno.glm.logistic.hybrid.rsid",
-                   "../result/GWAS_onco_asian.pheno.glm.logistic.hybrid.rsid"),
+runmeta(sumfiles=c("../result/GWAS_icogs_asian.case.glm.logistic.hybrid.rsid",
+                   "../result/GWAS_onco_asian.case.glm.logistic.hybrid.rsid"),
         outprefix="../result/meta_asian_lr")
 addrsid_meta=function(sumfile="../result/meta_euro_lr.meta")
 {
@@ -204,18 +204,19 @@ addrsid_meta=function(sumfile="../result/meta_euro_lr.meta")
 addrsid_meta(sumfile="../result/meta_euro_lr.meta")
 addrsid_meta(sumfile="../result/meta_asian_lr.meta")
 #previous results
-load("../result/compute_metapvalues_new.RData")
+load("../result/compute_metapvalues_newQC.RData")
+pdf("../result/pvalues_traininglogistic_acat.pdf")
 tmp=intersect(names(allpvalues),metares$SNP)
 idx1=match(tmp,names(allpvalues))
 idx2=match(tmp,metares$SNP)
 plot(-log10(allpvalues[idx1]),-log10(metares$P[idx2]),xlab="-log10(ACAT p-value)",ylab="-log10(Logistic reg p-value")
 abline(0,1,col="red")
-
+dev.off()
 
 metapvalues=metares$P
 names(metapvalues)=metares$SNP
 
-load("../result/metascoreinfo4_new.RData")
+load("../result/metascoreinfo4_newQC.RData")
 
 library("plotrix") #axis.break
 library("RColorBrewer")
@@ -475,3 +476,11 @@ myplot=function(myallpvalues=allpvalues,outprefix="waldtest_meta")
 }
 
 myplot(myallpvalues=metapvalues,outprefix="logisticregression")
+metares=as.data.frame(fread("../result/meta_euro_lr.meta"))
+metapvalues=metares$P
+names(metapvalues)=metares$SNP
+myplot(myallpvalues=metapvalues,outprefix="logisticregression_euro")
+metares=as.data.frame(fread("../result/meta_asian_lr.meta"))
+metapvalues=metares$P
+names(metapvalues)=metares$SNP
+myplot(myallpvalues=metapvalues,outprefix="logisticregression_asian")

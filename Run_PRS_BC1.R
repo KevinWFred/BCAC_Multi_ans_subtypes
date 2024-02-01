@@ -7,11 +7,11 @@ plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
 plink2="/usr/local/apps/plink/2.3-alpha/plink2"
 
 #for EUR
-metafile="../result/euro_training_sumstats.txt"
+metafile="../result/PRS1/euro_training_sumstats.txt"
 metadat=as.data.frame(fread(metafile))
 
 #CT
-runCT=function(sumstatfile="../result/euro_training_sumstats.txt",prefix_tun="../result/PRS/euro_onco_tuning",outprefix="PRS/euro/euro")
+runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tun="../result/PRS1/euro_onco_tuning",outprefix="PRS1/euro/euro")
 {
   #CT method
   #parameters for clumping
@@ -33,35 +33,35 @@ runCT=function(sumstatfile="../result/euro_training_sumstats.txt",prefix_tun="..
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
              "--out ../result/",outprefix,"_tun"," --memory 128000")
   system(cmd)
-  prefix_val1="../result/PRS/african_onco_validation"
+  prefix_val1="../result/PRS1/african_onco_validation"
   score_val1=paste0("../result/",outprefix,"_validation_onco_african")
   cmd=paste0(plink2," --bfile ",prefix_val1," --score ../result/",outprefix,".score ",
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
-             "--out ../result/",outprefix,"_validation_onco_african"," --memory 128000")
+             "--out ",score_val1," --memory 128000")
   system(cmd)
-  prefix_val2="../result/PRS/african_icogs_validation"
+  prefix_val2="../result/PRS1/african_icogs_validation"
   score_val2=paste0("../result/",outprefix,"_validation_icogs_african")
   cmd=paste0(plink2," --bfile ",prefix_val2," --score ../result/",outprefix,".score ",
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
-             "--out ../result/",outprefix,"_validation_icogs_african"," --memory 128000")
+             "--out ",score_val2," --memory 128000")
   system(cmd)
-  prefix_val3="../result/PRS/asian_onco_validation"
+  prefix_val3="../result/PRS1/asian_onco_validation"
   score_val3=paste0("../result/",outprefix,"_validation_onco_asian")
   cmd=paste0(plink2," --bfile ",prefix_val3," --score ../result/",outprefix,".score ",
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
-             "--out ../result/",outprefix,"_validation_onco_asian"," --memory 128000")
+             "--out ",score_val3," --memory 128000")
   system(cmd)
-  prefix_val4="../result/PRS/euro_onco_validation"
+  prefix_val4="../result/PRS1/euro_onco_validation"
   score_val4=paste0("../result/",outprefix,"_validation_onco_euro")
   cmd=paste0(plink2," --bfile ",prefix_val4," --score ../result/",outprefix,".score ",
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
-             "--out ../result/",outprefix,"_validation_onco_euro"," --memory 128000")
+             "--out ",score_val4," --memory 128000")
   system(cmd)
-  prefix_val5="../result/PRS/hispanic_onco_validation"
+  prefix_val5="../result/PRS1/hispanic_onco_validation"
   score_val5=paste0("../result/",outprefix,"_validation_onco_hispanic")
   cmd=paste0(plink2," --bfile ",prefix_val5," --score ../result/",outprefix,".score ",
              "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ../result/",outprefix,".pvalue --extract ../result/",outprefix,".clumpedsnp ",
-             "--out ../result/",outprefix,"_validation_onco_hispanic"," --memory 128000")
+             "--out ",score_val5," --memory 128000")
   system(cmd)
   
   pthres <- c(5E-08,5E-07,5E-06,5E-05,5E-05,5E-03,5E-02,5E-01,1) 
@@ -107,16 +107,19 @@ runCT=function(sumstatfile="../result/euro_training_sumstats.txt",prefix_tun="..
 }
 
 #euro
-#5e-6, 380 SNPs
-# onco_african icogs_african   onco_asian    onco_euro onco_hispanic
-# AUC         0.5589561     0.5559816    0.5971513 6.283141e-01     0.5705742
+#5e-6, 387 SNPs
+#          onco_african icogs_african   onco_asian    onco_euro onco_hispanic
+# AUC         0.5597353     0.5522557    0.5973346 6.274929e-01     0.5676048
 # totaln   5569.0000000  1758.0000000 5406.0000000 2.771000e+04  2413.0000000
 # casen    3481.0000000   941.0000000 2663.0000000 1.480900e+04  1195.0000000
 # controln 2088.0000000   817.0000000 2743.0000000 1.290100e+04  1218.0000000
 #asian
-#5e-7, 17 SNPs
-# onco_african icogs_african   onco_asian    onco_euro onco_hispanic
-# AUC         0.5443029     0.5241123    0.5602626 5.666202e-01     0.5473487
+#5e-5, 127 SNPs
+#          onco_african icogs_african   onco_asian    onco_euro onco_hispanic
+# AUC         0.5233717     0.5236688    0.5600331 5.339368e-01     0.5219497
+# totaln   5569.0000000  1758.0000000 5406.0000000 2.771000e+04  2413.0000000
+# casen    3481.0000000   941.0000000 2663.0000000 1.480900e+04  1195.0000000
+# controln 2088.0000000   817.0000000 2743.0000000 1.290100e+04  1218.0000000
 
 #LDpred2
 library(bigsnpr)
@@ -127,7 +130,7 @@ options(default.nproc.blas = NULL)
 # read in phenotype and covariates
 library(data.table)
 library(magrittr)
-run_ldpred2=function(tmpdir=1,sumstatfile="../result/euro_training_sumstats.txt",prefix_tun="../result/PRS/euro_onco_tuning",prefix_val="../result/six10k_test",outprefix="PRS/euro/euro")
+run_ldpred2=function(tmpdir=3,sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tun="../result/PRS1/euro_onco_tuning",prefix_val="../result/six10k_test",outprefix="PRS1/euro/euro",opfiltertuning=F)
 {
   print(sumstatfile)
   print(prefix_tun)
@@ -164,9 +167,24 @@ run_ldpred2=function(tmpdir=1,sumstatfile="../result/euro_training_sumstats.txt"
   corr <- NULL
   ld <- NULL
   
+  #to remove mono snps in tuning data (which result NAs in computing corr)
+  if (opfiltertuning)
+  {
+    cmd=paste0(plink," --bfile ",prefix_tun," --maf 0.01 --make-bed --out ",prefix_tun,"_maf05 --memory 128000 --threads 8")
+    system(cmd)
+  }
+  
   # preprocess the bed file (only need to do once for each data set)
-  if (!file.exists(paste0(prefix_tun,".rds")))
-    snp_readBed(paste0(prefix_tun,".bed"))
+  if (opfiltertuning)
+  {
+    if (!file.exists(paste0(prefix_tun,"_maf05.rds")))
+      snp_readBed(paste0(prefix_tun,"_maf05.bed"))
+  }else
+  {
+    if (!file.exists(paste0(prefix_tun,".rds")))
+      snp_readBed(paste0(prefix_tun,".bed"))
+  }
+  
   # now attach the genotype object
   
   obj.bigSNP <- snp_attach(paste0(prefix_tun,".rds"))

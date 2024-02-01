@@ -8,7 +8,7 @@ setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 .libPaths(c("/data/wangx53",.libPaths()))
 system("source '/data/BB_Bioinformatics/Kevin/tools/python2/bin/activate'")
 tmp=Sys.getenv("PATH")
-tmp1=paste0("/data/BB_Bioinformatics/Kevin/tools/generic-new_fugue/bin:/data/BB_Bioinformatics/Kevin/tools/locuszoom/bin:/data/BB_Bioinformatics/Kevin/tools/python2/bin:")
+tmp1=paste0("/usr/local/apps/samtools/1.19/bin:/data/BB_Bioinformatics/Kevin/tools/generic-new_fugue/bin:/data/BB_Bioinformatics/Kevin/tools/locuszoom/bin:/data/BB_Bioinformatics/Kevin/tools/python2/bin:")
 Sys.setenv(PATH=paste0(tmp1,tmp))
 system("ml samtools")
 print(Sys.getenv("PATH"))
@@ -32,8 +32,9 @@ euro_onco_pvar=as.data.frame(fread("../result/imp_onco/euro/euro.pvar"))
 african_onco_pvar=as.data.frame(fread("../result/imp_onco/african/african.pvar"))
 
 load("../result/compute_metapvalues_population_QC.RData")
-#load("../result/metascoreinfo4_newQC.RData")
-
+load("../result/metascoreinfo4_newQC.RData")
+load("../result/compute_metapvalues_newQC.RData")
+allpvalues=allpvalues[names(allpvalues) %in% names(metascoreinfo4$freq[metascoreinfo4$freq>0.01])] #16454816
 update_bimhg19pos=function(bimfile="../result/zoomlocus/Snpchr12_81015799_G_T_asian.bim",
                            hg19posfile=hg19posfile)
 {
@@ -160,7 +161,7 @@ tmp2=data.frame(code="/data/BB_Bioinformatics/Kevin/BCAC/code/run_zoomlocus.R",s
                 i1=1:nrow(tmp1),outprefix=rep("QC",nrow(tmp1)))
 tmp=rbind(tmp,tmp2)
 #write.table(tmp,file="run_zoomlocus.swarm",row.names=F,col.names=F,sep="\t",quote=F)
-#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/run_zoomlocus.swarm -g 72 --module R --time 1-00:00:00 --gres=lscratch:64
+#swarm -f /data/BB_Bioinformatics/Kevin/BCAC/code/run_zoomlocus.swarm -g 128 --module R --time 1-00:00:00 --gres=lscratch:64
 #
 # for (i in 1:nrow(tmp))
 # {

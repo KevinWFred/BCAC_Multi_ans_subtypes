@@ -617,6 +617,33 @@ dim(easexistingtable)
 # [1] 10884844       11
 afrexistingtable=as.data.frame(fread("unzip -p ../data/bcac_icogs_onco_african_meta_1kg_p3.zip",header=T,sep="\t"))
 
+#euro_onco_info=as.data.frame(fread("../data/imp_infoscore/data/euro_onco/myinfoscore.txt"))
+find_MAF=function(dat=allres1[,c("ID","MAF_EAS")],infofile="../data/imp_infoscore/data/asian_onco/infoscore.txt")
+{
+  idx=which(is.na(dat[,2]))
+  if (length(idx)>0)
+  {
+    tmp=as.data.frame(fread(infofile,nrows=2))
+    if(!"MAF" %in% colnames(tmp))
+    {
+      MAFcol=which(colnames(tmp)=="AF")
+    }else
+    {
+      MAFcol=which(colnames(tmp)=="MAF")
+    }
+
+    for (i in idx)
+    {
+      cmd=paste0("grep ",dat$ID[i]," ",infofile)
+      out=system(cmd,intern = T)
+      out=unlist(strsplit(out,"\t"))
+      maf=as.numeric(out[MAFcol])
+      if (maf>0.5) maf=1-maf
+      dat[i,2]=maf
+    }
+  }
+  return(dat)
+}
 get_allres=function(snpfile="../result/QCallnovelsnps.csv",condisionalfile="../result/QCconditional_analysis_res.csv",
                     outprefix="QC")
 {
@@ -705,6 +732,16 @@ get_allres=function(snpfile="../result/QCallnovelsnps.csv",condisionalfile="../r
   sum(tmp2 %in% tmp1) #8
   idx=match(tmp1,tmp2)
   allres1$AFR_existingP=afrexistingtable$`P-value`[idx]
+  #add missing MAF
+  mafres=find_MAF(dat=allres1[,c("ID","MAF_EUR")],infofile="../data/imp_infoscore/data/euro_onco/infoscore.txt")
+  table(allres1$MAF_EUR==mafres$MAF_EUR)
+  allres1$MAF_EUR=mafres$MAF_EUR
+  mafres=find_MAF(dat=allres1[,c("ID","MAF_EAS")],infofile="../data/imp_infoscore/data/asian_onco/infoscore.txt")
+  table(allres1$MAF_EAS==mafres$MAF_EAS)
+  allres1$MAF_EAS=mafres$MAF_EAS
+  mafres=find_MAF(dat=allres1[,c("ID","MAF_AFR")],infofile="../data/imp_infoscore/data/african_onco/infoscore.txt")
+  table(allres1$MAF_AFR==mafres$MAF_AFR)
+  allres1$MAF_AFR=mafres$MAF_AFR
   write.csv(allres1,file=paste0("../result/",outprefix,"allcandidatenovelsnps.csv"),row.names = F)
 
 }
