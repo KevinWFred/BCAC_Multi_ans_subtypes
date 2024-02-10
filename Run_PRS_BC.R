@@ -2,13 +2,167 @@
 .libPaths(c("/data/wangx53",.libPaths()))
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 
+set.seed(1000)
 library(data.table)
+library(pROC)
+#library(SuperLearner)
+library(RISCA)
+library(boot)
+library(tidyverse)
 plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
 plink2="/usr/local/apps/plink/2.3-alpha/plink2"
+phenoicogs=read.table("../data/concept_750_zhang_icogs_pheno_v15_02_age.txt",header=T,sep="\t")
+phenoicogs$ID=phenoicogs$SG_ID
+idx=which(colnames(phenoicogs) %in% paste0("pc",1:10))
+phenoicogs[,idx]=NULL
+tmp=read.table("../result/imp_icogs/merged1.eigenvec")
+colnames(tmp)=c("ID",paste0("pc",1:20))
+tmp1=unlist(strsplit(tmp$ID,"_"))
+tmp$ID=tmp1[seq(1,length(tmp1),2)]
+idx=match(phenoicogs$ID,tmp$ID)
+phenoicogs=cbind(phenoicogs,tmp[idx,2:11])
 
-#for EUR
-metafile="../result/PRS1/euro_training_sumstats.txt"
-metadat=as.data.frame(fread(metafile))
+phenoonco=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
+phenoonco$ID=phenoonco$Onc_ID
+colnames(phenoonco)=gsub("PC_","pc",colnames(phenoonco))
+
+get_pheno.prs=function(prs=prs$V6,famval)
+{
+  phenotype=phenoicogs
+  if (!all(famval$V2 %in% phenoicogs$ID))
+  {
+    phenotype=phenoonco
+  }
+  phenotype=phenotype[match(famval$V2,phenotype$ID),]
+  pheno.prs=phenotype
+  pheno.prs$prs=prs
+  pheno.prs$y=famval$V6-1
+  pheno.prs=pheno.prs[,c("ID",paste0("pc",1:10),"age","Behaviour1","y","prs")]
+  return(pheno.prs)
+}
+myscale=function(pheno.prs)
+{
+  idx=which(is.na(pheno.prs$Behaviour1)) #control
+  pheno.prs$prs=(pheno.prs$prs-mean(pheno.prs$prs[idx]))/sd(pheno.prs$prs[idx])
+  return(pheno.prs)
+}
+
+RISCA_AUC=function(pheno.prs)
+{
+  set.seed(1000)
+  pheno.prs=myscale(pheno.prs)
+  
+  # roc_obj_pv = roc.binary(status = "y", estimator = "pv",
+  #                         variable = "prs",
+  #                         confounders = ~EV1+EV2+EV3+EV4+EV5+EV6+
+  #                           EV7+EV8+EV9+EV10+AGE,
+  #                         data = pheno.prs,
+  #                         precision=seq(0.05,0.95, by=0.05))
+  confounders = c(paste0("pc",1:10),"age")
+  idx=match(confounders,colnames(pheno.prs))
+  idx=complete.cases(pheno.prs[,idx])
+  pheno.prs=pheno.prs[idx,]
+  roc_obj_ipw = roc.binary(status = "y", estimator = "ipw",
+                           variable = "prs",
+                           #confounders = ~1,
+                           confounders = ~pc1+pc2+pc3+pc4+pc5+pc6+
+                             pc7+pc8+pc9+pc10+age,
+                           data = pheno.prs,
+                           precision=seq(0.05,0.95, by=0.05))
+  #print(roc_obj_pv$auc)
+  #print(roc_obj_ipw$auc)
+  return(roc_obj_ipw$auc)
+}
+
+AUCBoot = function(data,indices){
+  if (max(data$y)!=1) data$y=data$y-1 #y:1,2-->0,1
+  boot_data = data[indices, ]
+  model4 <- glm(y~prs, data=boot_data,family = "binomial")
+  predicted4 <- predict(model4,boot_data, type="response")
+  auc=as.numeric(pROC::auc(boot_data$y,predicted4,quiet=T))
+  return(c(auc))
+}
+
+AUCadjBoot = function(data,indices){
+  boot_data = data[indices, ]
+  confounders = c(paste0("pc",1:10),"age")
+  idx=match(confounders,colnames(data))
+  idx=complete.cases(boot_data[,idx])
+  boot_data=boot_data[idx,]
+  roc_obj_ipw = roc.binary(status = "y", estimator = "ipw",
+                           variable = "prs",
+                           confounders = ~pc1+pc2+pc3+pc4+pc5+pc6+
+                             pc7+pc8+pc9+pc10+age,
+                           data = boot_data,
+                           precision=seq(0.05,0.95, by=0.05))
+  auc=roc_obj_ipw$auc
+  return(c(auc))
+}
+
+#allprs is a list of 5 val PRS dataframe
+#allfamval is a list of 5 val fam dataframe
+get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT")
+{
+  #validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+  #validationscores=c(score_val1,score_val2,score_val3,score_val4,score_val5)
+  
+  CTauc_val=data.frame(matrix(NA,nrow=6,ncol=6))
+  colnames(CTauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
+  rownames(CTauc_val)=c("AUC","AUClow","AUChigh","AUCadj","AUCadjlow","AUCadjhigh")
+  afrpheno.prs=NULL
+  for (i in 1:5)
+  {
+    prs=allprs[[i]]
+    famval=allfamval[[i]]
+    if ("numeric" %in% class(prs))
+    {
+      pheno.prs=get_pheno.prs(prs=prs,famval)  #prs should align with famval
+    }else
+    {
+      all(prs[,1]==famval[,1])
+      pheno.prs=get_pheno.prs(prs=prs[,ncol(prs)],famval) #prs should align with famval
+    }
+    
+    if (i %in% c(1,2))
+    {
+      afrpheno.prs=rbind(afrpheno.prs,pheno.prs)
+    }
+    model1 <- glm(I(y==1)~prs, data=pheno.prs,family = "binomial")
+    predicted1 <- predict(model1,pheno.prs, type="response")
+    CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+    boot_auc = boot(data =pheno.prs, statistic = AUCBoot, R = 1000)
+    tmp=boot.ci(boot_auc,type="perc")
+    CTauc_val[2,i]=tmp$percent[4] #low
+    CTauc_val[3,i]=tmp$percent[5] #high
+    CTauc_val[4,i]=RISCA_AUC(pheno.prs)
+    boot_aucadj = boot(data =pheno.prs, statistic = AUCadjBoot, R = 1000)
+    tmp=boot.ci(boot_aucadj,type="perc")
+    CTauc_val[5,i]=tmp$percent[4] #adjlow
+    CTauc_val[6,i]=tmp$percent[5] #adjhigh
+  }
+  
+  model1 <- glm(I(y==1)~prs, data=afrpheno.prs,family = "binomial")
+  predicted1 <- predict(model1,afrpheno.prs, type="response")
+  CTauc_val[1,6]=as.numeric(pROC::auc(afrpheno.prs$y,predicted1,quiet=T))
+  boot_auc = boot(data =afrpheno.prs, statistic = AUCBoot, R = 1000)
+  tmp=boot.ci(boot_auc,type="perc")
+  CTauc_val[2,6]=tmp$percent[4] #low
+  CTauc_val[3,6]=tmp$percent[5] #high
+  CTauc_val[4,6]=RISCA_AUC(afrpheno.prs)
+  boot_aucadj = boot(data =afrpheno.prs, statistic = AUCadjBoot, R = 1000)
+  tmp=boot.ci(boot_aucadj,type="perc")
+  CTauc_val[5,6]=tmp$percent[4] #adjlow
+  CTauc_val[6,6]=tmp$percent[5] #adjhigh
+  write.table(CTauc_val,file=paste0(outprefix,"_",methodprefix,"_valauc.txt"),row.names=F,sep="\t",quote=F)
+  allres=list(auc=CTauc_val,allprs=allprs,allfamval=allfamval)
+  save(allres,file=paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+  return(allres)
+}
+
+
+# #for EUR
+# metafile="../result/PRS1/euro_training_sumstats.txt"
+# metadat=as.data.frame(fread(metafile))
 
 #CT
 runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tun="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/euro/euro")
@@ -19,50 +173,50 @@ runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tu
   r2thr=0.1
   kbpthr=500
   
-  cmd=paste0(plink," --bfile ",prefix_tun," --clump ",sumstatfile," --clump-p1 ",
-             pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field rsid --clump-field p --out ",outprefix," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink," --bfile ",prefix_tun," --clump ",sumstatfile," --clump-p1 ",
+  #            pthr," --clump-r2 ",r2thr," --clump-kb ",kbpthr," --clump-snp-field rsid --clump-field p --out ",outprefix," --memory 128000")
+  # system(cmd)
   clumpsnp=read.table(paste0(outprefix,".clumped"),header=T)
-  write.table(clumpsnp$SNP,file=paste0(outprefix,".clumpedsnp"),row.names=F,col.names = F,quote=F)
-  sumstat=as.data.frame(fread(sumstatfile))
-  tmp=data.frame(SNP=sumstat$rsid,A1=sumstat$a1,beta=sumstat$beta)
-  write.table(tmp,file=paste0(outprefix,".score"),row.names=F,col.names=T,sep=" ",quote=F)
-  tmp=data.frame(SNP=sumstat$rsid,P=sumstat$p)
-  write.table(tmp,file=paste0(outprefix,".pvalue"),row.names=F,col.names=T,sep=" ",quote=F)
-  cmd=paste0(plink2," --bfile ",prefix_tun," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",outprefix,"_tun"," --memory 128000")
-  system(cmd)
+  # write.table(clumpsnp$SNP,file=paste0(outprefix,".clumpedsnp"),row.names=F,col.names = F,quote=F)
+  # sumstat=as.data.frame(fread(sumstatfile))
+  # tmp=data.frame(SNP=sumstat$rsid,A1=sumstat$a1,beta=sumstat$beta)
+  # write.table(tmp,file=paste0(outprefix,".score"),row.names=F,col.names=T,sep=" ",quote=F)
+  # tmp=data.frame(SNP=sumstat$rsid,P=sumstat$p)
+  # write.table(tmp,file=paste0(outprefix,".pvalue"),row.names=F,col.names=T,sep=" ",quote=F)
+  # cmd=paste0(plink2," --bfile ",prefix_tun," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",outprefix,"_tun"," --memory 128000")
+  # system(cmd)
   prefix_val1="../result/PRS1/african_onco_validation"
   score_val1=paste0(outprefix,"_validation_onco_african")
-  cmd=paste0(plink2," --bfile ",prefix_val1," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",score_val1," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink2," --bfile ",prefix_val1," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",score_val1," --memory 128000")
+  # system(cmd)
   prefix_val2="../result/PRS1/african_icogs_validation"
   score_val2=paste0(outprefix,"_validation_icogs_african")
-  cmd=paste0(plink2," --bfile ",prefix_val2," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",score_val2," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink2," --bfile ",prefix_val2," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",score_val2," --memory 128000")
+  # system(cmd)
   prefix_val3="../result/PRS1/asian_onco_validation"
   score_val3=paste0(outprefix,"_validation_onco_asian")
-  cmd=paste0(plink2," --bfile ",prefix_val3," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",score_val3," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink2," --bfile ",prefix_val3," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",score_val3," --memory 128000")
+  # system(cmd)
   prefix_val4="../result/PRS1/euro_onco_validation"
   score_val4=paste0(outprefix,"_validation_onco_euro")
-  cmd=paste0(plink2," --bfile ",prefix_val4," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",score_val4," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink2," --bfile ",prefix_val4," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",score_val4," --memory 128000")
+  # system(cmd)
   prefix_val5="../result/PRS1/hispanic_onco_validation"
   score_val5=paste0(outprefix,"_validation_onco_hispanic")
-  cmd=paste0(plink2," --bfile ",prefix_val5," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",score_val5," --memory 128000")
-  system(cmd)
+  # cmd=paste0(plink2," --bfile ",prefix_val5," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",score_val5," --memory 128000")
+  # system(cmd)
   
   pthres <- c(5E-08,5E-07,5E-06,5E-05,5E-05,5E-03,5E-02,5E-01,1) 
   famtun=read.table(paste0(prefix_tun,".fam"))
@@ -85,50 +239,34 @@ runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tu
   print(paste0("pvalue_optimal: ",pvalue_opitmal))
   print(paste0("number of snps: ",sum(clumpsnp$P<pvalue_opitmal)))
   
-  #add tuning PRS on the other tuning data(for example tuning eur PRS on tuning asian data),used for weighted PRS
-  other_prefix_tun="../result/PRS1/euro_onco_tuning"
-  other_score_tun="../result/PRS1/asian/asian_tun_euro_tun" #asian PRS on euro onco
-  if (prefix_tun=="../result/PRS1/euro_onco_tuning")
-  {
-    other_prefix_tun="../result/PRS1/asian_onco_tuning"
-    other_score_tun="../result/PRS1/euro/euro_tun_asian_tun"
-  }
-  cmd=paste0(plink2," --bfile ",other_prefix_tun," --score ",outprefix,".score ",
-             "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
-             "--out ",other_score_tun," --memory 128000")
-  system(cmd)
+  # #add tuning PRS on the other tuning data(for example tuning eur PRS on tuning asian data),used for weighted PRS
+  # other_prefix_tun="../result/PRS1/euro_onco_tuning"
+  # other_score_tun="../result/PRS1/asian/asian_tun_euro_tun" #asian PRS on euro onco
+  # if (prefix_tun=="../result/PRS1/euro_onco_tuning")
+  # {
+  #   other_prefix_tun="../result/PRS1/asian_onco_tuning"
+  #   other_score_tun="../result/PRS1/euro/euro_tun_asian_tun"
+  # }
+  # cmd=paste0(plink2," --bfile ",other_prefix_tun," --score ",outprefix,".score ",
+  #            "--q-score-range /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/range_list ",outprefix,".pvalue --extract ",outprefix,".clumpedsnp ",
+  #            "--out ",other_score_tun," --memory 128000")
+  # system(cmd)
   validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
   validationscores=c(score_val1,score_val2,score_val3,score_val4,score_val5)
-  CTauc_val=data.frame(matrix(NA,nrow=4,ncol=6))
-  colnames(CTauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
-  rownames(CTauc_val)=c("AUC","totaln","casen","controln")
-  afrprs=afrfam=NULL
+  allprs=allfamval=list()
   for (i in 1:5)
   {
     prs=read.table(paste0(validationscores[i],".p_value_",idx_optimal,".sscore"))
+    allprs[[i]]=prs
     famval=read.table(paste0(validationprefix[i],".fam"))
-    if (i %in% c(1,2))
-    {
-      afrprs=rbind(afrprs,prs)
-      afrfam=rbind(afrfam,famval)
-    }
-    all(prs$V1==famval$V1)
-    pheno.prs=data.frame(y=famval$V6,prs=prs$V6)
-    model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-    predicted1 <- predict(model1,pheno.prs, type="response")
-    CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    CTauc_val[2,i]=nrow(famval)
-    CTauc_val[3,i]=sum(famval$V6==2)
-    CTauc_val[4,i]=sum(famval$V6==1)
+    allfamval[[i]]=famval
   }
-  all(afrprs$V1==afrfam$V1)
-  pheno.prs=data.frame(y=afrfam$V6,prs=afrprs$V6)
-  model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-  predicted1 <- predict(model1,pheno.prs, type="response")
-  CTauc_val[1,6]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+  CTauc_val=get_valauc(allprs,allfamval,outprefix,methodprefix="CT")
   return(CTauc_val)
 }
-
+print(Sys.time())
+euroCT=runCT()
+print(Sys.time())
 #euro
 #5e-6, 387 SNPs
 #          onco_african icogs_african   onco_asian    onco_euro onco_hispanic african
@@ -136,6 +274,10 @@ runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tu
 # totaln   5569.0000000  1758.0000000 5406.0000000 2.771000e+04  2413.0000000
 # casen    3481.0000000   941.0000000 2663.0000000 1.480900e+04  1195.0000000
 # controln 2088.0000000   817.0000000 2743.0000000 1.290100e+04  1218.0000000
+
+print(Sys.time())
+asianCT=runCT(sumstatfile="../result/PRS1/asian_training_sumstats.txt",prefix_tun="../result/PRS1/asian_onco_tuning",outprefix="../result/PRS1/asian/asian")
+print(Sys.time())
 #asian
 #5e-5, 127 SNPs
 #          onco_african icogs_african   onco_asian    onco_euro onco_hispanic afircan
@@ -189,45 +331,69 @@ Weighted_CTprs=function()
   validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
   validationscores1=c(score_val1_1,score_val2_1,score_val3_1,score_val4_1,score_val5_1) #euro prs
   validationscores2=c(score_val1_2,score_val2_2,score_val3_2,score_val4_2,score_val5_2) #asian prs
-  Weighted_CTauc_val=data.frame(matrix(NA,nrow=4,ncol=6))
-  colnames(Weighted_CTauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
-  rownames(Weighted_CTauc_val)=c("AUC","totaln","casen","controln")
-  afrprs=afrfam=NULL
+  
+  allprs=allfamval=list()
   for (i in 1:5)
   {
     prs1=read.table(paste0(validationscores1[i],".p_value_",idx_optimal1,".sscore"))
     prs2=read.table(paste0(validationscores2[i],".p_value_",idx_optimal2,".sscore"))
     prs=prs1$V6*w1+prs2$V6*w2
+    allprs[[i]]=prs
     famval=read.table(paste0(validationprefix[i],".fam"))
+    allfamval[[i]]=famval
     all(prs1$V1==famval$V1)
     all(prs2$V1==famval$V1)
-    if (i %in% c(1,2))
-    {
-      afrprs=c(afrprs,prs)
-      afrfam=rbind(afrfam,famval)
-    }
-    
-    pheno.prs=data.frame(y=famval$V6,prs=prs)
-    model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-    predicted1 <- predict(model1,pheno.prs, type="response")
-    Weighted_CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    Weighted_CTauc_val[2,i]=nrow(famval)
-    Weighted_CTauc_val[3,i]=sum(famval$V6==2)
-    Weighted_CTauc_val[4,i]=sum(famval$V6==1)
   }
-
-  pheno.prs=data.frame(y=afrfam$V6,prs=afrprs)
-  model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-  predicted1 <- predict(model1,pheno.prs, type="response")
-  Weighted_CTauc_val[1,6]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+  Weighted_CTauc_val=get_valauc(allprs,allfamval,outprefix="../result/PRS1/Weighted",methodprefix="CT")
   
   return(Weighted_CTauc_val)
 }
+WeightedCT=Weighted_CTprs()
 #          onco_african icogs_african   onco_asian    onco_euro onco_hispanic   african
 # AUC         0.5590266     0.5518596    0.5967572 6.269937e-01     0.5671613 0.5568423
 
 
 #LDpred2
+get_PRS_genotype=function(betafile="../result/PRS1/euro/euro_LDpred_weights.txt",betaprefix="../result/PRS1/euro_ldpredweight",prefix="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/euro/euro")
+{
+  ldpredprefix=paste0(outprefix,"_",basename(prefix),"_ldpred")
+  scorefile=paste0(ldpredprefix,".score")
+  if (!file.exists(scorefile)) #if file exist, no need to generate again
+  {
+    beta=as.data.frame(fread(betafile))
+    bim=as.data.frame(fread(paste0(prefix,".bim")))
+    comsnps=intersect(bim$V2,beta$snp)
+    idx1=match(comsnps,bim$V2)
+    idx2=match(comsnps,beta$snp)
+    bim=bim[idx1,]
+    beta=beta[idx2,]
+    idx1=which(beta$effect==bim$V5)
+    idx2=which(beta$effect==bim$V6)
+    a2=bim$V6
+    a2[idx2]=bim$V5[idx2]
+    tmp=data.frame(snp=beta$snp,a2=a2)
+    a2file=paste0(betaprefix,".a2")
+    write.table(tmp,file=a2file,col.names = F,row.names = F,sep="\t",quote=F)
+    snpfile=paste0(betaprefix,".snp")
+    write.table(tmp$snp,file=snpfile,col.names = F,row.names = F,sep="\t",quote=F)
+    
+    cmd=paste0(plink2," --bfile ",prefix, " --ref-allele ",a2file," --extract ",snpfile," --make-bed --out ",ldpredprefix)
+    system(cmd)
+    cmd=paste0(plink," --bfile ",ldpredprefix," --allow-no-sex --score ",betafile," header sum --out ",ldpredprefix," --memory 64000 --threads 8")
+    system(cmd)
+    PRS=read.table(paste0(ldpredprefix,".profile"),header=T)
+    system(paste0("rm ",ldpredprefix,".bed"))
+    system(paste0("rm ",ldpredprefix,".bim"))
+    system(paste0("rm ",ldpredprefix,".fam"))
+    
+    write.table(PRS,file=scorefile,row.names = F,sep="\t",quote=F)
+  }else
+  {
+    PRS=read.table(scorefile,header=T)
+  }
+  
+  return(PRS)
+}
 library(bigsnpr)
 options(bigstatsr.check.parallel.blas = FALSE)
 options(default.nproc.blas = NULL)
@@ -244,219 +410,196 @@ run_ldpred2=function(tmpdir0="euro",sumstatfile="../result/PRS1/euro_training_su
   #2. Obtain HapMap3 SNPs
   #LDpred2 authors recommend restricting the analysis to only the HapMap3 SNPs
   #load HapMap3 SNPs
-  # info <- readRDS(runonce::download_file(
-  #   "https://ndownloader.figshare.com/files/25503788",
-  #   fname = "map_hm3_ldpred2.rds"))
-  info =readRDS("/data/BB_Bioinformatics/Kevin/tools/ldpred2/map_hm3_ldpred2.rds")
+  # info =readRDS("/data/BB_Bioinformatics/Kevin/tools/ldpred2/map_hm3_ldpred2.rds")
   #write.table(info$rsid,file="../result/PRS1/ldpred2_hw3snp.txt",row.names = F,col.names = F,quote=F)
   #3. Load and transform the summary statistic file
   #Load summary statistic file
   # Read in the summary statistic file
-  sumdat=as.data.frame(fread(sumstatfile)) #8242741,6753434
-  print("sumdat dim:")
-  print(dim(sumdat))
-  # LDpred 2 require the header to follow the exact naming. a1 :effect allelle
-  sumdat1=data.frame(chr=sumdat$chr,pos=sumdat$pos,rsid=sumdat$rsid,a0=sumdat$a0,a1=sumdat$a1,n_eff=sumdat$n_eff,beta_se=sumdat$beta_se,p=sumdat$p,beta=sumdat$beta)
-  sumdat1=sumdat1[sumdat1$beta!=0,]
-  fwrite(sumdat1,file=paste0(sumstatfile,".ldpred"),row.names=F,sep="\t")
-  sumstats <- bigreadr::fread2(paste0(sumstatfile,".ldpred")) 
-  
-  # Filter out hapmap SNPs
-  sumstats <- sumstats[sumstats$rsid%in% info$rsid,] #1012780,811530
-  write.table(sumstats$rsid,file=paste0(outprefix,"_sumstats_hw3snp.txt"),row.names = F,col.names = F,quote=F)
-  print("sumstat in HM3:")
-  print(nrow(sumstats))
-  #3. Calculate the LD matrix
-  # Get maximum amount of cores
-  NCORES <- nb_cores()
-  # Open a temporary file
-  tmpdir <- tempfile(tmpdir = paste0("tmp_data_",tmpdir0))
-  #on.exit(file.remove(paste0(tmp, ".sbk")), add = TRUE)
- 
-  #to remove mono snps in tuning data (which result NAs in computing corr)
-  if (opfiltertuning)
-  {
-    cmd=paste0(plink," --bfile ",prefix_tun," --maf 0.01 --extract ../result/PRS1/ldpred2_hw3snp.txt"," --make-bed --out ",prefix_tun,"_ldpred_maf01 --memory 128000 --threads 8")
-    system(cmd)
-    cmd=paste0(plink," --bfile ",prefix_tun,"_ldpred_maf01 --extract ",outprefix,"_sumstats_hw3snp.txt --make-bed --out ",prefix_tun,"_ldpred_maf01 --memory 128000 --threads 8")
-    system(cmd)
-  }
-  
-  # preprocess the bed file (only need to do once for each data set)
-  if (opfiltertuning)
-  {
-    file.remove(paste0(prefix_tun,"_ldpred_maf01.bk"))
-    #if (!file.exists(paste0(prefix_tun,"_ldpred_maf01.rds")))
-    snp_readBed(paste0(prefix_tun,"_ldpred_maf01.bed"))
-    # now attach the genotype object
-    obj.bigSNP <- snp_attach(paste0(prefix_tun,"_ldpred_maf01.rds"))
-  }else
-  {
-    #if (!file.exists(paste0(prefix_tun,".rds")))
-    snp_readBed(paste0(prefix_tun,".bed"))
-    obj.bigSNP <- snp_attach(paste0(prefix_tun,".rds"))
-  }
-  
-  # extract the SNP information from the genotype
-  map <- obj.bigSNP$map[-3]
-  names(map) <- c("chr", "rsid", "pos", "a1", "a0")
-  table(map$rsid %in% sumstats$rsid)
-  # perform SNP matching
-  info_snp <- snp_match(sumstats, map)
-  table(info_snp$rsid==map$rsid)
-  write.table(info_snp,file=paste0(outprefix,"_LDpred_","info_snp.txt"),row.names=F,sep="\t",quote=F)
-  # Assign the genotype to a variable for easier downstream analysis
-  genotype <- obj.bigSNP$genotypes
-  genotype1 = snp_fastImputeSimple(genotype)
-  # Rename the data structures
-  CHR <- map$chr
-  POS <- map$pos
-  # get the CM information from 1000 Genome
-  # will download the 1000G file to the current directory (".")
-  POS2 <- snp_asGeneticPos(CHR, POS, dir = ".")
-  
-  # Initialize variables for storing the LD score and LD matrix
-  corr <- NULL
-  ld <- NULL
-  
-  # calculate LD
-  for (chr in 1:22) {
-    print(chr)
-    # Extract SNPs that are included in the chromosome
-    ind.chr <- which(info_snp$chr == chr)
-    ind.chr2 <- info_snp$`_NUM_ID_`[ind.chr]
-    # Calculate the LD
-    corr0 <- snp_cor(
-      genotype,
-      ind.col = ind.chr2,
-      ncores = NCORES,
-      infos.pos = POS2[ind.chr2],
-      size = 3 / 1000
-    )
-    if (chr == 1) {
-      ld <- Matrix::colSums(corr0^2)
-      corr <- as_SFBM(corr0, tmpdir)
-    } else {
-      ld0=Matrix::colSums(corr0^2)
-      ld <- c(ld, Matrix::colSums(corr0^2))
-      corr$add_columns(corr0, nrow(corr))
-    }
-    if (sum(is.na(ld))>0) stop(chr)
-  }
-  save(ld,corr,file=paste0(outprefix,"_LDpred_","ld.RData"))
-  #4. Perform LD score regression
-  df_beta <- info_snp[,c("beta", "beta_se", "n_eff", "_NUM_ID_")]
-  rownames(df_beta)=info_snp$rsid.ss
-  ldsc <- snp_ldsc(   ld,
-                      length(ld),
-                      chi2 = (df_beta$beta / df_beta$beta_se)^2,
-                      sample_size = df_beta$n_eff,
-                      blocks = NULL)
-  # ldsc <- snp_ldsc2(corr,df_beta)
-  h2_est <- ldsc[["h2"]] #asn:0.058
-  print(paste0("h2_est:",h2_est))
-  if (ldsc[['h2']] < 0) print('h2 negative')
-  
-  
-  #6 grid model
-  # Prepare data for grid model
-  p_seq <- signif(seq_log(1e-5, 1, length.out = 21), 2)
-  h2_seq <- round(h2_est * c(0.3,0.7, 1, 1.4), 4)
-  grid.param <-
-    expand.grid(p = p_seq,
-                h2 = h2_seq,
-                sparse = c(FALSE, TRUE))
-  # Get adjusted beta from grid model
-  set.seed(1000) # to get the same result every time
-  beta_grid <-
-    snp_ldpred2_grid(corr, df_beta, grid.param, ncores = 1)
-  
-  
-  famtun=read.table(paste0(prefix_tun,".fam"))
-  pred_grid <- big_prodMat( genotype1, 
-                            beta_grid, 
-                            ind.col = info_snp$`_NUM_ID_`)
-  rownames(pred_grid)=famtun$V2
-  
-  #to get AUC on tunning
-  auc_tun=rep(0,ncol(pred_grid))
-  
-  for (i in 1:ncol(pred_grid))
-  {
-    if (any(!is.na(pred_grid[,i])))
-    {
-      pheno.prs=cbind.data.frame(y=famtun$V6,prs=pred_grid[,i])
-      
-      model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-      predicted1 <- predict(model1,pheno.prs, type="response")
-      auc_tun[i]= as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    }
-  }
-  idx_optimal=which.max(auc_tun)
-  param_optimal=grid.param[idx_optimal,]
-  ldpred_beta=data.frame(snp=info_snp$rsid.ss,effect=info_snp$a1,beta=beta_grid[,idx_optimal])
+  # sumdat=as.data.frame(fread(sumstatfile)) #8242741,6753434
+  # print("sumdat dim:")
+  # print(dim(sumdat))
+  # # LDpred 2 require the header to follow the exact naming. a1 :effect allelle
+  # sumdat1=data.frame(chr=sumdat$chr,pos=sumdat$pos,rsid=sumdat$rsid,a0=sumdat$a0,a1=sumdat$a1,n_eff=sumdat$n_eff,beta_se=sumdat$beta_se,p=sumdat$p,beta=sumdat$beta)
+  # sumdat1=sumdat1[sumdat1$beta!=0,]
+  # fwrite(sumdat1,file=paste0(sumstatfile,".ldpred"),row.names=F,sep="\t")
+  # sumstats <- bigreadr::fread2(paste0(sumstatfile,".ldpred")) 
+  # 
+  # # Filter out hapmap SNPs
+  # sumstats <- sumstats[sumstats$rsid%in% info$rsid,] #1012780,811530
+  # write.table(sumstats$rsid,file=paste0(outprefix,"_sumstats_hw3snp.txt"),row.names = F,col.names = F,quote=F)
+  # print("sumstat in HM3:")
+  # print(nrow(sumstats))
+  # #3. Calculate the LD matrix
+  # # Get maximum amount of cores
+  # NCORES <- nb_cores()
+  # # Open a temporary file
+  # tmpdir <- tempfile(tmpdir = paste0("tmp_data_",tmpdir0))
+  # #on.exit(file.remove(paste0(tmp, ".sbk")), add = TRUE)
+  # 
+  # #to remove mono snps in tuning data (which result NAs in computing corr)
+  # if (opfiltertuning)
+  # {
+  #   cmd=paste0(plink," --bfile ",prefix_tun," --maf 0.01 --extract ../result/PRS1/ldpred2_hw3snp.txt"," --make-bed --out ",prefix_tun,"_ldpred_maf01 --memory 128000 --threads 8")
+  #   system(cmd)
+  #   cmd=paste0(plink," --bfile ",prefix_tun,"_ldpred_maf01 --extract ",outprefix,"_sumstats_hw3snp.txt --make-bed --out ",prefix_tun,"_ldpred_maf01 --memory 128000 --threads 8")
+  #   system(cmd)
+  # }
+  # 
+  # # preprocess the bed file (only need to do once for each data set)
+  # if (opfiltertuning)
+  # {
+  #   file.remove(paste0(prefix_tun,"_ldpred_maf01.bk"))
+  #   #if (!file.exists(paste0(prefix_tun,"_ldpred_maf01.rds")))
+  #   snp_readBed(paste0(prefix_tun,"_ldpred_maf01.bed"))
+  #   # now attach the genotype object
+  #   obj.bigSNP <- snp_attach(paste0(prefix_tun,"_ldpred_maf01.rds"))
+  # }else
+  # {
+  #   #if (!file.exists(paste0(prefix_tun,".rds")))
+  #   snp_readBed(paste0(prefix_tun,".bed"))
+  #   obj.bigSNP <- snp_attach(paste0(prefix_tun,".rds"))
+  # }
+  # 
+  # # extract the SNP information from the genotype
+  # map <- obj.bigSNP$map[-3]
+  # names(map) <- c("chr", "rsid", "pos", "a1", "a0")
+  # table(map$rsid %in% sumstats$rsid)
+  # # perform SNP matching
+  # info_snp <- snp_match(sumstats, map)
+  # table(info_snp$rsid==map$rsid)
+  # write.table(info_snp,file=paste0(outprefix,"_LDpred_","info_snp.txt"),row.names=F,sep="\t",quote=F)
+  # # Assign the genotype to a variable for easier downstream analysis
+  # genotype <- obj.bigSNP$genotypes
+  # genotype1 = snp_fastImputeSimple(genotype)
+  # # Rename the data structures
+  # CHR <- map$chr
+  # POS <- map$pos
+  # # get the CM information from 1000 Genome
+  # # will download the 1000G file to the current directory (".")
+  # POS2 <- snp_asGeneticPos(CHR, POS, dir = ".")
+  # 
+  # # Initialize variables for storing the LD score and LD matrix
+  # corr <- NULL
+  # ld <- NULL
+  # 
+  # # calculate LD
+  # for (chr in 1:22) {
+  #   print(chr)
+  #   # Extract SNPs that are included in the chromosome
+  #   ind.chr <- which(info_snp$chr == chr)
+  #   ind.chr2 <- info_snp$`_NUM_ID_`[ind.chr]
+  #   # Calculate the LD
+  #   corr0 <- snp_cor(
+  #     genotype,
+  #     ind.col = ind.chr2,
+  #     ncores = NCORES,
+  #     infos.pos = POS2[ind.chr2],
+  #     size = 3 / 1000
+  #   )
+  #   if (chr == 1) {
+  #     ld <- Matrix::colSums(corr0^2)
+  #     corr <- as_SFBM(corr0, tmpdir)
+  #   } else {
+  #     ld0=Matrix::colSums(corr0^2)
+  #     ld <- c(ld, Matrix::colSums(corr0^2))
+  #     corr$add_columns(corr0, nrow(corr))
+  #   }
+  #   if (sum(is.na(ld))>0) stop(chr)
+  # }
+  # save(ld,corr,file=paste0(outprefix,"_LDpred_","ld.RData"))
+  # #4. Perform LD score regression
+  # df_beta <- info_snp[,c("beta", "beta_se", "n_eff", "_NUM_ID_")]
+  # rownames(df_beta)=info_snp$rsid.ss
+  # ldsc <- snp_ldsc(   ld,
+  #                     length(ld),
+  #                     chi2 = (df_beta$beta / df_beta$beta_se)^2,
+  #                     sample_size = df_beta$n_eff,
+  #                     blocks = NULL)
+  # # ldsc <- snp_ldsc2(corr,df_beta)
+  # h2_est <- ldsc[["h2"]] #asn:0.058
+  # print(paste0("h2_est:",h2_est))
+  # if (ldsc[['h2']] < 0) print('h2 negative')
+  # 
+  # 
+  # #6 grid model
+  # # Prepare data for grid model
+  # p_seq <- signif(seq_log(1e-5, 1, length.out = 21), 2)
+  # h2_seq <- round(h2_est * c(0.3,0.7, 1, 1.4), 4)
+  # grid.param <-
+  #   expand.grid(p = p_seq,
+  #               h2 = h2_seq,
+  #               sparse = c(FALSE, TRUE))
+  # # Get adjusted beta from grid model
+  # set.seed(1000) # to get the same result every time
+  # beta_grid <-
+  #   snp_ldpred2_grid(corr, df_beta, grid.param, ncores = 1)
+  # 
+  # 
+  # famtun=read.table(paste0(prefix_tun,".fam"))
+  # pred_grid <- big_prodMat( genotype1, 
+  #                           beta_grid, 
+  #                           ind.col = info_snp$`_NUM_ID_`)
+  # rownames(pred_grid)=famtun$V2
+  # 
+  # #to get AUC on tunning
+  # auc_tun=rep(0,ncol(pred_grid))
+  # 
+  # for (i in 1:ncol(pred_grid))
+  # {
+  #   if (any(!is.na(pred_grid[,i])))
+  #   {
+  #     pheno.prs=cbind.data.frame(y=famtun$V6,prs=pred_grid[,i])
+  #     
+  #     model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
+  #     predicted1 <- predict(model1,pheno.prs, type="response")
+  #     auc_tun[i]= as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+  #   }
+  # }
+  # idx_optimal=which.max(auc_tun)
+  # param_optimal=grid.param[idx_optimal,]
+  # ldpred_beta=data.frame(snp=info_snp$rsid.ss,effect=info_snp$a1,beta=beta_grid[,idx_optimal])
   betafile=paste0(outprefix,"_LDpred_weights.txt")
-  write.table(ldpred_beta,file=betafile,row.names = F,sep="\t",quote=F)
+  # write.table(ldpred_beta,file=betafile,row.names = F,sep="\t",quote=F)
   
-  #save PRS on tuning data
-  #euro:../result/PRS1/euro/euro_tuning_ldpredprs.txt
-  #asian:../result/PRS1/asian/asian_tuning_ldpredprs.txt
-  tun.prs=cbind.data.frame(famtun,prs=pred_grid[,idx_optimal])
-  write.table(tun.prs,file=paste0(outprefix,"_tuning_ldpredprs.txt"),row.names = F,sep="\t",quote=F)
-  save(ld,corr,beta_grid,pred_grid,ldsc,df_beta,grid.param,auc_tun,idx_optimal,param_optimal,file=paste0(outprefix,"LDpred_pred.RData"))
-  #add tuning PRS on the other tuning data(for example tuning eur PRS on tuning asian data),used for weighted PRS
-  other_prefix_tun="../result/PRS1/euro_onco_tuning" #asian PRS on euro onco
-  if (prefix_tun=="../result/PRS1/euro_onco_tuning")
-  {
-    other_prefix_tun="../result/PRS1/asian_onco_tuning"
-  }
-  #euro prs on onco asian tuning: ../result/PRS1/euro/euro_asian_onco_tuning_ldpred.score
-  #asian prs on onco euro tuning: ../result/PRS1/asian/asian_euro_onco_tuning_ldpred.score
-  other_prs_tun=get_PRS_genotype(betafile=betafile,betaprefix=paste0(outprefix,"_ldpredweight"),prefix=other_prefix_tun,outprefix=outprefix)
-  
+  # #save PRS on tuning data
+  # #euro:../result/PRS1/euro/euro_tuning_ldpredprs.txt
+  # #asian:../result/PRS1/asian/asian_tuning_ldpredprs.txt
+  # tun.prs=cbind.data.frame(famtun,prs=pred_grid[,idx_optimal])
+  # write.table(tun.prs,file=paste0(outprefix,"_tuning_ldpredprs.txt"),row.names = F,sep="\t",quote=F)
+  # save(ld,corr,beta_grid,pred_grid,ldsc,df_beta,grid.param,auc_tun,idx_optimal,param_optimal,file=paste0(outprefix,"LDpred_pred.RData"))
+  # #add tuning PRS on the other tuning data(for example tuning eur PRS on tuning asian data),used for weighted PRS
+  # other_prefix_tun="../result/PRS1/euro_onco_tuning" #asian PRS on euro onco
+  # if (prefix_tun=="../result/PRS1/euro_onco_tuning")
+  # {
+  #   other_prefix_tun="../result/PRS1/asian_onco_tuning"
+  # }
+  # #euro prs on onco asian tuning: ../result/PRS1/euro/euro_asian_onco_tuning_ldpred.score
+  # #asian prs on onco euro tuning: ../result/PRS1/asian/asian_euro_onco_tuning_ldpred.score
+  # other_prs_tun=get_PRS_genotype(betafile=betafile,betaprefix=paste0(outprefix,"_ldpredweight"),prefix=other_prefix_tun,outprefix=outprefix)
+  # 
   #validation
   prefix_val1="../result/PRS1/african_onco_validation"
   prefix_val2="../result/PRS1/african_icogs_validation"
   prefix_val3="../result/PRS1/asian_onco_validation"
   prefix_val4="../result/PRS1/euro_onco_validation"
   prefix_val5="../result/PRS1/hispanic_onco_validation"
- 
+  
   validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
   
-  LDpredauc_val=data.frame(matrix(NA,nrow=4,ncol=6))
-  colnames(LDpredauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
-  rownames(LDpredauc_val)=c("AUC","totaln","casen","controln")
-  afrprs=afrfam=NULL
+  allprs=allfamval=list()
   for (i in 1:5)
   {
     prs=get_PRS_genotype(betafile=betafile,betaprefix=paste0(outprefix,"_ldpredweight"),prefix=validationprefix[i],outprefix=outprefix)
-
+    allprs[[i]]=prs
     #prs=read.table(paste0(validationscores[i],".p_value_",idx_optimal,".sscore"))
     famval=read.table(paste0(validationprefix[i],".fam"))
-    if (i %in% c(1,2))
-    {
-      afrprs=rbind(afrprs,prs)
-      afrfam=rbind(afrfam,famval)
-    }
-    all(prs$IID==famval$V1)
-    pheno.prs=data.frame(y=famval$V6,prs=prs$SCORESUM)
-    model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-    predicted1 <- predict(model1,pheno.prs, type="response")
-    LDpredauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    LDpredauc_val[2,i]=nrow(famval)
-    LDpredauc_val[3,i]=sum(famval$V6==2)
-    LDpredauc_val[4,i]=sum(famval$V6==1)
+    allfamval[[i]]=famval
   }
-  all(afrprs$V1==afrfam$V1)
-  pheno.prs=data.frame(y=afrfam$V6,prs=afrprs$SCORESUM)
-  model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-  predicted1 <- predict(model1,pheno.prs, type="response")
-  LDpredauc_val[1,6]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-  write.table(LDpredauc_val,file=paste0(outprefix,"_ldpred_valauc.txt"),row.names=F,sep="\t",quote=F)
-  # 
+  LDpredauc_val=get_valauc(allprs,allfamval,outprefix=outprefix,methodprefix="LDpred")
   
   return(LDpredauc_val)
 }
+euroLDpred=run_ldpred2(tmpdir0="euro",sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tun="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/euro/euro",opfiltertuning=T)
 
 #euro:
 #         onco_african icogs_african   onco_asian    onco_euro onco_hispanic   african
@@ -465,43 +608,14 @@ run_ldpred2=function(tmpdir0="euro",sumstatfile="../result/PRS1/euro_training_su
 # casen    3481.0000000   941.0000000 2663.0000000 1.480900e+04  1195.0000000        NA
 # controln 2088.0000000   817.0000000 2743.0000000 1.290100e+04  1218.0000000        NA
 
+asianLDpred=run_ldpred2(tmpdir0="asian",sumstatfile="../result/PRS1/asian_training_sumstats.txt",prefix_tun="../result/PRS1/asian_onco_tuning",outprefix="../result/PRS1/asian/asian",opfiltertuning=T)
 #asian
 #          onco_african icogs_african   onco_asian   onco_euro onco_hispanic   african
 # AUC         0.5505593     0.5346977    0.5874594 5.75309e-01     0.5638608 0.5518476
 # totaln   5569.0000000  1758.0000000 5406.0000000 2.77100e+04  2413.0000000        NA
 # casen    3481.0000000   941.0000000 2663.0000000 1.48090e+04  1195.0000000        NA
 # controln 2088.0000000   817.0000000 2743.0000000 1.29010e+04  1218.0000000        NA
-get_PRS_genotype=function(betafile="../result/PRS1/euro/euro_LDpred_weights.txt",betaprefix="../result/PRS1/euro_ldpredweight",prefix="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/euro/euro")
-{
-  beta=as.data.frame(fread(betafile))
-  bim=as.data.frame(fread(paste0(prefix,".bim")))
-  comsnps=intersect(bim$V2,beta$snp)
-  idx1=match(comsnps,bim$V2)
-  idx2=match(comsnps,beta$snp)
-  bim=bim[idx1,]
-  beta=beta[idx2,]
-  idx1=which(beta$effect==bim$V5)
-  idx2=which(beta$effect==bim$V6)
-  a2=bim$V6
-  a2[idx2]=bim$V5[idx2]
-  tmp=data.frame(snp=beta$snp,a2=a2)
-  a2file=paste0(betaprefix,".a2")
-  write.table(tmp,file=a2file,col.names = F,row.names = F,sep="\t",quote=F)
-  snpfile=paste0(betaprefix,".snp")
-  write.table(tmp$snp,file=snpfile,col.names = F,row.names = F,sep="\t",quote=F)
-  ldpredprefix=paste0(outprefix,"_",basename(prefix),"_ldpred")
-  cmd=paste0(plink2," --bfile ",prefix, " --ref-allele ",a2file," --extract ",snpfile," --make-bed --out ",ldpredprefix)
-  system(cmd)
-  cmd=paste0(plink," --bfile ",ldpredprefix," --allow-no-sex --score ",betafile," header sum --out ",ldpredprefix," --memory 64000 --threads 8")
-  system(cmd)
-  PRS=read.table(paste0(ldpredprefix,".profile"),header=T)
-  system(paste0("rm ",ldpredprefix,".bed"))
-  system(paste0("rm ",ldpredprefix,".bim"))
-  system(paste0("rm ",ldpredprefix,".fam"))
-  scorefile=paste0(ldpredprefix,".score")
-  write.table(PRS,file=scorefile,row.names = F,sep="\t",quote=F)
-  return(PRS)
-}
+
 
 Weighted_ldpredprs=function()
 {
@@ -536,39 +650,69 @@ Weighted_ldpredprs=function()
   #asian prs
   validationprefix2=paste0("../result/PRS1/asian/asian_",basename(validationprefix),"_ldpred")
   
-  Weighted_LDpredauc_val=data.frame(matrix(NA,nrow=4,ncol=6))
-  colnames(Weighted_LDpredauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
-  rownames(Weighted_LDpredauc_val)=c("AUC","totaln","casen","controln")
-  afrprs=afrfam=NULL
+  allprs=allfamval=list()
   for (i in 1:5)
   {
     prs1=read.table(paste0(validationprefix1[i],".score"),header=T)
     prs2=read.table(paste0(validationprefix2[i],".score"),header=T)
     prs=prs1$SCORESUM*w1+prs2$SCORESUM*w2
+    allprs[[i]]=prs
     famval=read.table(paste0(validationprefix[i],".fam"))
-    all(prs1$V1==famval$V1)
-    all(prs2$V1==famval$V1)
-    if (i %in% c(1,2))
-    {
-      afrprs=c(afrprs,prs)
-      afrfam=rbind(afrfam,famval)
-    }
-    
-    pheno.prs=data.frame(y=famval$V6,prs=prs)
-    model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-    predicted1 <- predict(model1,pheno.prs, type="response")
-    Weighted_LDpredauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    Weighted_LDpredauc_val[2,i]=nrow(famval)
-    Weighted_LDpredauc_val[3,i]=sum(famval$V6==2)
-    Weighted_LDpredauc_val[4,i]=sum(famval$V6==1)
+    allfamval[[i]]=famval
   }
-  
-  pheno.prs=data.frame(y=afrfam$V6,prs=afrprs)
-  model1 <- glm(I(y==2)~prs, data=pheno.prs,family = "binomial")
-  predicted1 <- predict(model1,pheno.prs, type="response")
-  Weighted_LDpredauc_val[1,6]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+  Weighted_LDpredauc_val=get_valauc(allprs,allfamval,outprefix="../result/PRS1/Weighted",methodprefix="LDpred")
   
   return(Weighted_LDpredauc_val)
 }
+WeightedLDpred=Weighted_ldpredprs()
 #          onco_african icogs_african   onco_asian    onco_euro onco_hispanic   african
 # AUC         0.5755086     0.5609777    0.6187005 6.530507e-01     0.6060151 0.5717066
+
+#collect the above val auc results
+outprefix="../result/PRS1/euro/euro"
+methodprefix="CT"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+euroCT=allres
+outprefix="../result/PRS1/asian/asian"
+methodprefix="CT"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+asianCT=allres
+outprefix="../result/PRS1/Weighted"
+methodprefix="CT"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+WeightedCT=allres
+
+outprefix="../result/PRS1/euro/euro"
+methodprefix="LDpred"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+euroLDpred=allres
+outprefix="../result/PRS1/asian/asian"
+methodprefix="LDpred"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+asianLDpred=allres
+outprefix="../result/PRS1/Weighted"
+methodprefix="LDpred"
+load(paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+WeightedLDpred=allres
+save(euroCT,asianCT,WeightedCT,euroLDpred,asianLDpred,WeightedLDpred,file="../result/Run_PRS_BC.RData")
+
+get_auctable=function(aucres=euroCT$auc)
+{
+  aucres=round(aucres,digits = 3)
+  res=data.frame(matrix(NA,1,4))
+  colnames(res)=c("AFR","ASN","EUR","HIS")
+  res$AFR=paste0(aucres$african[1],"(",aucres$african[2],",",aucres$african[3],")")
+  res$ASN=paste0(aucres$onco_asian[1],"(",aucres$onco_asian[2],",",aucres$onco_asian[3],")")
+  res$EUR=paste0(aucres$onco_euro[1],"(",aucres$onco_euro[2],",",aucres$onco_euro[3],")")
+  res$HIS=paste0(aucres$onco_hispanic[1],"(",aucres$onco_hispanic[2],",",aucres$onco_hispanic[3],")")
+  return(res)
+}
+tmp=list(euroCT$auc,asianCT$auc,WeightedCT$auc,euroLDpred$auc,asianLDpred$auc,WeightedLDpred$auc)
+allauctable=NULL
+for (i in 1:length(tmp))
+{
+  tmp1=get_auctable(aucres=tmp[[i]])
+  allauctable=rbind(allauctable,tmp1)
+}
+rownames(allauctable)=c("EURCT","ASNCT","WeightedCT","EURLDpred2","ASNLDpred2","WeightedLDpred2")
+write.csv(allauctable,file="../result/validationAUC.csv")  
