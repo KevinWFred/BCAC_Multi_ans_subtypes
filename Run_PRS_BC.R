@@ -21,10 +21,16 @@ tmp1=unlist(strsplit(tmp$ID,"_"))
 tmp$ID=tmp1[seq(1,length(tmp1),2)]
 idx=match(phenoicogs$ID,tmp$ID)
 phenoicogs=cbind(phenoicogs,tmp[idx,2:11])
+phenoicogs$y=NA
+phenoicogs$y[which(phenoicogs$Behaviour1==1)]=1
+phenoicogs$y[which(is.na(phenoicogs$Behaviour1))]=0
 
 phenoonco=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
 phenoonco$ID=phenoonco$Onc_ID
 colnames(phenoonco)=gsub("PC_","pc",colnames(phenoonco))
+phenoonco$y=NA
+phenoonco$y[which(phenoonco$Behaviour1==1)]=1
+phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
 
 get_pheno.prs=function(prs=prs$V6,famval)
 {
@@ -716,3 +722,178 @@ for (i in 1:length(tmp))
 }
 rownames(allauctable)=c("EURCT","ASNCT","WeightedCT","EURLDpred2","ASNLDpred2","WeightedLDpred2")
 write.csv(allauctable,file="../result/validationAUC.csv")  
+
+#PRSCSx
+phi = c("phi1e+00","phi1e-02","phi1e-04","phi1e-06")
+
+#get PRS based on tuning data
+#targetEAS_EURprs_asian_onco_tuning, targetEAS,EUR PRS on asian_onco_tuning
+# Asian target PRS: ../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuningPRS.sscore, ../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuningPRS.sscore
+# beta: ../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_.prs_coeff, ../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_.prs_coeff
+get_PRScsxprs_tuning=function(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix="../result/PRS1/asian_onco_tuning",outprefix="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuning")
+{
+  if (!file.exists(paste0(prefix,"PRS.sscore")))
+  {
+    #read posterior SNP effect size
+    betadat=NULL
+    for (chr in 1:22)
+    {
+      datlist=list()
+      for (i in 1:4)
+      {
+        myphi=phi[i]
+        myfile=paste0(prefix,myphi,"_chr",chr,".txt")
+        if (file.exists(myfile))
+        {
+          datlist[[i]]=fread(myfile)
+          
+        }else
+        {
+          warning(paste0(myfile," is not existed"))
+        }
+      }
+      #all(datlist[[1]]$V4==datlist[[4]]$V4)
+      betadat_chr=cbind.data.frame(SNP=datlist[[1]]$V2,A1=datlist[[1]]$V4,phi1=datlist[[1]]$V6,phi2=datlist[[2]]$V6,phi4=datlist[[3]]$V6,phi6=datlist[[4]]$V6)
+      betadat=rbind(betadat,betadat_chr)
+    }
+    betaoutfile=paste0(prefix,".prs_coeff")
+    write.table(betadat,file=betaoutfile,row.names = F,sep="\t",quote=F)
+    
+    #use plink to get PRS
+    cmd=paste0(plink2," --pfile ",bimprefix," --score-col-nums 3-",ncol(betadat),
+               " --score ",betaoutfile," cols=+scoresums,-scoreavgs header no-mean-imputation ",
+               " --out ",outprefix,"PRS"," --memory 64000 --threads 8")
+    
+    system(cmd)
+  }
+  
+  prsdat=read.table(paste0(outprefix,"PRS.sscore"))
+  prsdat=prsdat %>% select(V1,V6,V7,V8,V9) %>%
+    rename(ID=V1,phi1=V6,phi2=V7,phi4=V8,phi6=V9)
+  write.table(prsdat,file=paste0(outprefix,"PRS.sscore"),row.names = F,sep="\t",quote=F)
+  #return(prsdat)
+}
+#Target EAS
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix="../result/PRS1/asian_onco_tuning",outprefix="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuning")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix="../result/PRS1/asian_onco_tuning",outprefix="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuning")
+#get prs on validation
+prefix_val1="../result/PRS1/african_onco_validation"
+prefix_val2="../result/PRS1/african_icogs_validation"
+prefix_val3="../result/PRS1/asian_onco_validation"
+prefix_val4="../result/PRS1/euro_onco_validation"
+prefix_val5="../result/PRS1/hispanic_onco_validation"
+validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+#../result/PRS1/prscsx/targetEAS_EURprs_african_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val1,outprefix="../result/PRS1/prscsx/targetEAS_EURprs_african_onco_validation")
+#../result/PRS1/prscsx/targetEAS_EASprs_african_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val1,outprefix="../result/PRS1/prscsx/targetEAS_EASprs_african_onco_validation")
+
+#../result/PRS1/prscsx/targetEAS_EURprs_african_icogs_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val2,outprefix="../result/PRS1/prscsx/targetEAS_EURprs_african_icogs_validation")
+#../result/PRS1/prscsx/targetEAS_EASprs_african_icogs_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val2,outprefix="../result/PRS1/prscsx/targetEAS_EASprs_african_icogs_validation")
+
+#../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val3,outprefix="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_validation")
+#../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val3,outprefix="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_validation")
+
+#../result/PRS1/prscsx/targetEAS_EURprs_euro_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val4,outprefix="../result/PRS1/prscsx/targetEAS_EURprs_euro_onco_validation")
+#../result/PRS1/prscsx/targetEAS_EASprs_euro_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val4,outprefix="../result/PRS1/prscsx/targetEAS_EASprs_euro_onco_validation")
+
+#../result/PRS1/prscsx/targetEAS_EURprs_hispanic_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val5,outprefix="../result/PRS1/prscsx/targetEAS_EURprs_hispanic_onco_validation")
+#../result/PRS1/prscsx/targetEAS_EASprs_hispanic_onco_validationPRS.sscore
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/asian_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val5,outprefix="../result/PRS1/prscsx/targetEAS_EASprs_hispanic_onco_validation")
+
+#targetEUR
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/prscsx/targetEUR_EURprs_asian_onco_tuning")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/prscsx/targetEUR_EASprs_asian_onco_tuning")
+
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val1,outprefix="../result/PRS1/prscsx/targetEUR_EURprs_african_onco_validation")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val1,outprefix="../result/PRS1/prscsx/targetEUR_EASprs_african_onco_validation")
+
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val2,outprefix="../result/PRS1/prscsx/targetEUR_EURprs_african_icogs_validation")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val2,outprefix="../result/PRS1/prscsx/targetEUR_EASprs_african_icogs_validation")
+
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val3,outprefix="../result/PRS1/prscsx/targetEUR_EURprs_asian_onco_validation")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val3,outprefix="../result/PRS1/prscsx/targetEUR_EASprs_asian_onco_validation")
+
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val4,outprefix="../result/PRS1/prscsx/targetEUR_EURprs_euro_onco_validation")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val4,outprefix="../result/PRS1/prscsx/targetEUR_EASprs_euro_onco_validation")
+
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EUR_pst_eff_a1_b0.5_",bimprefix=prefix_val5,outprefix="../result/PRS1/prscsx/targetEUR_EURprs_hispanic_onco_validation")
+get_PRScsxprs_tuning(prefix="../result/PRS1/prscsx/euro_onco_tuning_EAS_pst_eff_a1_b0.5_",bimprefix=prefix_val5,outprefix="../result/PRS1/prscsx/targetEUR_EASprs_hispanic_onco_validation")
+
+#get AUC on validation
+targetEASEURprsfiles=paste0("../result/PRS1/prscsx/targetEAS_EURprs_",basename(validationprefix),"PRS.sscore")
+targetEASEASprsfiles=paste0("../result/PRS1/prscsx/targetEAS_EASprs_",basename(validationprefix),"PRS.sscore")
+PRScsxprs=function(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuningPRS.sscore",
+                   PRS_EAS_tunfile="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuningPRS.sscore",
+                   EURprsfiles=targetEASEURprsfiles,EASprsfiles=targetEASEASprsfiles,
+                   target="EAS")
+{
+  #get optimal hyperparameter phi
+  PRS_EUR_tun=read.table(PRS_EUR_tunfile,header=T)
+  PRS_EAS_tun=read.table(PRS_EAS_tunfile,header=T)
+  auc_tun=data.frame(EUR=rep(0,4),EAS=rep(0,4),weighted=rep(0,4))
+  w1=w2=rep(0,4)
+  phenotype1=phenoonco[match(PRS_EUR_tun$ID,phenoonco$ID),]
+  for(i in 1:4)
+  {
+    pheno.prs=cbind.data.frame(phenotype1,prseur=PRS_EUR_tun[,i+1],prseas=PRS_EAS_tun[,i+1])
+    model1 <- glm(y~prseur, data=pheno.prs,family = "binomial")
+    predicted1 <- predict(model1,pheno.prs, type="response")
+    auc_tun$EUR[i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+    model2 <- glm(y~prseas, data=pheno.prs,family = "binomial")
+    predicted2 <- predict(model2,pheno.prs, type="response")
+    auc_tun$EAS[i]=as.numeric(pROC::auc(pheno.prs$y,predicted2,quiet=T))
+    model3 <- glm(y~prseur+prseas, data=pheno.prs,family = "binomial")
+    
+    w1[i]=summary(model3)$coefficients[2,1]
+    w2[i]=summary(model3)$coefficients[3,1]
+    pheno.prs=cbind.data.frame(phenotype1,weightedprs=w1[i]*PRS_EUR_tun[,i+1]+w2[i]*PRS_EAS_tun[,i+1])
+    model4 <- glm(y~weightedprs, data=pheno.prs,family = "binomial")
+    predicted4 <- predict(model4,pheno.prs, type="response")
+    auc_tun$weighted[i]=as.numeric(pROC::auc(pheno.prs$y,predicted4,quiet=T))
+  }
+  
+  idx_optimal=which.max(auc_tun$weighted)
+  print(idx_optimal)
+  allprs=allfamval=list()
+  for (i in 1:5)
+  {
+    prs1=read.table(EURprsfiles[i],header=T)
+    prs1=prs1[,idx_optimal+1]
+    prs2=read.table(EASprsfiles[i],header=T)
+    prs2=prs2[,idx_optimal+1]
+    prs=prs1*w1[idx_optimal]+prs2*w2[idx_optimal]
+    allprs[[i]]=prs
+    famval=read.table(paste0(validationprefix[i],".fam"))
+    allfamval[[i]]=famval
+  }
+  Target_PRScsx_val=get_valauc(allprs,allfamval,outprefix=paste0("../result/PRS1/Target",target),methodprefix="PRScsx")
+  
+  return(Target_PRScsx_val)
+}
+EASPRScsxprs=PRScsxprs(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuningPRS.sscore",
+                   PRS_EAS_tunfile="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuningPRS.sscore",
+                   EURprsfiles=targetEASEURprsfiles,EASprsfiles=targetEASEASprsfiles,
+                   target="EAS")
+
+targetEUREURprsfiles=paste0("../result/PRS1/prscsx/targetEUR_EURprs_",basename(validationprefix),"PRS.sscore")
+targetEUREASprsfiles=paste0("../result/PRS1/prscsx/targetEUR_EASprs_",basename(validationprefix),"PRS.sscore")
+EURPRScsxprs=PRScsxprs(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEUR_EURprs_asian_onco_tuningPRS.sscore",
+          PRS_EAS_tunfile="../result/PRS1/prscsx/targetEUR_EASprs_asian_onco_tuningPRS.sscore",
+          EURprsfiles=targetEUREURprsfiles,EASprsfiles=targetEUREASprsfiles,
+          target="EUR")
+
+EASPRScsxprs=read.table("../result/PRS1/TargetEAS_PRScsx_valauc.txt",header=T)
+EURPRScsxprs=read.table("../result/PRS1/TargetEUR_PRScsx_valauc.txt",header=T)
+EASPRScsx_table=get_auctable(aucres=EASPRScsxprs)
+EURPRScsx_table=get_auctable(aucres=EURPRScsxprs)
+PRScsx_table=rbind(EASPRScsx_table,EURPRScsx_table)
+rownames(PRScsx_table)=c("TargetEAS","TargetEUR")
+write.csv(PRScsx_table,file="../result/PRS1/prscsx/PRScsx_table.csv")
