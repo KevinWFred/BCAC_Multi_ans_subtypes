@@ -171,6 +171,7 @@ get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT")
 # metadat=as.data.frame(fread(metafile))
 
 #CT
+#euro_training_sumstats.txt came from QC_logistic_PRS.R
 runCT=function(sumstatfile="../result/PRS1/euro_training_sumstats.txt",prefix_tun="../result/PRS1/euro_onco_tuning",outprefix="../result/PRS1/euro/euro")
 {
   #CT method

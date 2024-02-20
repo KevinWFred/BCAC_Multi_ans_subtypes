@@ -428,7 +428,7 @@ print("done")
 
 createswarm=function(pop="euro")
 {
-  swarmjobs=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/compute_pvalues.R",1000),
+  swarmjobs=data.frame(code=rep("/data/BB_Bioinformatics/Kevin/BCAC/code/compute_intrinsic_pvalues.R",1000),
                        i1=1:1000,pop=pop)
   write.table(swarmjobs,file=paste0("compute_metap_",pop,".swarm"),row.names=F,col.names=F,sep="\t",quote=F)
 }

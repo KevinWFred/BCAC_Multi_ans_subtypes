@@ -63,7 +63,7 @@ eur_icogs_freq=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/eu
 eur_onco_freq=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/euro_training_onco.afreq"))
 tmp=eur_icogs_freq %>% filter(ALT_FREQS<0.99 & ALT_FREQS>0.01) %>% select(ID)
 # tmp2=eur_onco_freq %>% filter(ALT_FREQS<0.99 & ALT_FREQS>0.01) %>% select(ID)
-# tmp=unique(c(tmp1$ID,tmp2$ID))
+# tmp=unique(c(tmp$ID,tmp2$ID))
 selsnps=intersect(selsnps,tmp$ID)
 length(selsnps) #8551464
 #eur_icogs_missing=as.data.frame(fread("/data/BB_Bioinformatics/Kevin/BCAC/result/euro_training_icogs.vmiss"))
@@ -97,6 +97,7 @@ length(selsnps) #8548410
 idx=match(selsnps,eursumdat$SNP)
 eursumdat1=eursumdat[idx,]
 eur_neff=as.integer(4*(1/(1/33505+1/33961)+1/(1/(26699+1/35150)))) #for LDpred2
+#most SNPid are chr:pos:alt:ref; some are chr:pos:ref:alt. As long as use rsid and A1, no problem.
 formsumstats=function(sumdat=eursumdat1,outprefix="euro_training",neff=eur_neff)
 {
   idx=which(colnames(sumdat) %in% c("chromosome","CHR"))
@@ -276,5 +277,50 @@ formgenotype(phenofile="../result/PRS_onco_other_validationpheno.txt",
              prefix="../result/imp_onco/hispanic/hispanic",
              outprefix="../result/PRS1/hispanic_onco_validation")
 
+#check if they have the same allele coding in different datasets
+compare2dat=function(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/asian_onco_tuning")
+{
+  dat1=fread(paste0(prefix1,".bim"))
+  dat2=fread(paste0(prefix2,".bim"))
+  dat1$ID=paste0(dat1$V1,":",dat1$V4,":",dat1$V5,":",dat1$V6)
+  dat2$ID=paste0(dat2$V1,":",dat2$V4,":",dat2$V5,":",dat2$V6)
+  dat1$ID1=paste0(dat1$V1,":",dat1$V4)
+  dat2$ID1=paste0(dat2$V1,":",dat2$V4)
+  idx1=dat1$ID1 %in% dat2$ID1
+  idx2=dat2$ID1 %in% dat1$ID1
+  dat1=dat1[idx1,]
+  dat2=dat2[idx2,]
+  print(paste0("dat1 in dat2: ",nrow(dat1)))
+  print(paste0("dat2 in dat1: ",nrow(dat2)))
+  idx1=dat1$ID %in% dat2$ID
+  idx2=dat2$ID %in% dat1$ID
+  if (sum(!idx1)>0)
+  {
+    dat11=dat1[!idx1,]
+    dat22=dat2[!idx2,]
+    tmp=unlist(strsplit(dat11$ID,":"))
+    chr=tmp[seq(1,length(tmp),4)]
+    pos=tmp[seq(2,length(tmp),4)]
+    alt=tmp[seq(3,length(tmp),4)]#this is not right, can be ref
+    ref=tmp[seq(4,length(tmp),4)]#this is not right, can be alt
+    tmp1=paste0(chr,":",pos,":",ref,":",alt)
+    tmp2=tmp1[tmp1 %in% dat2$ID]
+    print(paste0("dat1 mismatch in dat2: ",length(tmp2))) #number of mismatched snps in dat1
+    tmp=unlist(strsplit(dat22$ID,":"))
+    chr=tmp[seq(1,length(tmp),4)]
+    pos=tmp[seq(2,length(tmp),4)]
+    alt=tmp[seq(3,length(tmp),4)]
+    ref=tmp[seq(4,length(tmp),4)]
+    tmp1=paste0(chr,":",pos,":",ref,":",alt)
+    tmp2=tmp1[tmp1 %in% dat1$ID]
+    print(paste0("dat2 mismatch in dat1: ",length(tmp2)))
+  }
+}
 
-
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/asian_onco_tuning")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/african_icogs_validation")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/african_onco_validation")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/asian_onco_validation")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/euro_onco_validation")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/hispanic_onco_validation")
+compare2dat(prefix1="../result/PRS1/euro_onco_tuning",prefix2="../result/PRS1/tuning_validation")
