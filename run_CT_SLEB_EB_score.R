@@ -175,7 +175,12 @@ configfile=args[2] #CT_SLEB_never.config
 config=read.table(configfile)
 if (!file.exists(configfile)) stop("no input file.")
 #if (nrow(config)!=9 || ncol(config)!=2) stop("input file format is not right")
-
+subtype=NULL
+if (length(args)==3) #for subtype PRS
+{
+  subtype=args[3] #LumA
+  print(subtype)
+}
 #Specify the directory for the summary statistics
 EUR_sumstats_file <- config[1,2] #"../result/EUnever_CTSLEB.sumdat" #  reference population
 Target_sumstats_file <- config[2,2]  #"../result/EASnever_CTSLEB.sumdat" #  target population
@@ -294,6 +299,50 @@ colnames(phenoonco)=gsub("PC_","pc",colnames(phenoonco))
 phenoonco$y=NA
 phenoonco$y[which(phenoonco$Behaviour1==1)]=1
 phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
+
+call_subtype=function(pheno=phenoicogs)
+{
+  pheno$LumA=pheno$LumB=pheno$LumB_HN=pheno$Her2E=pheno$TripN=NA
+  idx=which(is.na(pheno$Behaviour1))
+  pheno$LumA[idx]=pheno$LumB[idx]=pheno$LumB_HN[idx]=pheno$Her2E[idx]=pheno$TripN[idx]=0
+  y.pheno.mis1 <- pheno[,c("ER_status1","PR_status1","HER2_status1","Grade1")]
+  
+  idx.1 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &(y.pheno.mis1[,4]==1|y.pheno.mis1[,4]==2))
+  pheno$LumA[idx.1]=1
+  #define Luminal-B like
+  idx.2 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==1)
+  pheno$LumB[idx.2]=1
+  #for Luminal B HER2 negative-like
+  idx.3 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &y.pheno.mis1[,4]==3)
+  pheno$LumB_HN[idx.3]=1
+  #for HER2 enriched-like
+  idx.4 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==1)
+  pheno$Her2E[idx.4]=1
+  #for Triple negative
+  idx.5 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==0)
+  pheno$TripN[idx.5]=1
+  return(pheno)
+  
+}
+phenoicogs=call_subtype(pheno=phenoicogs)
+phenoonco=call_subtype(pheno=phenoonco)
+
+if (!is.null(subtype)) #subtype PRS
+{
+  phenoicogs$y=NA
+  phenoicogs$y[which(phenoicogs[,subtype]==1)]=1
+  phenoicogs$y[which(is.na(phenoicogs$Behaviour1))]=0
+  phenoonco$y=NA
+  phenoonco$y[which(phenoonco[,subtype]==1)]=1
+  phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
+}
 idx=match(prs_tune[,1],phenoonco$ID)
 phenotype1=phenoonco[idx,]
 for(p_ind in 1:n.total.prs){

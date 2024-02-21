@@ -184,8 +184,10 @@ get_subtypeauc=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
 }
 
 get_subtypeauc(outprefix="../result/PRS1/Weighted",methodprefix="LDpred")
+get_subtypeauc(outprefix="../result/PRS1/TargetEUR",methodprefix="PRScsx")
+get_subtypeauc(outprefix="../result/PRS1/TargetEAS",methodprefix="PRScsx")
 
-get_auctable=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
+get_auctable=function(outprefix="../result/PRS1/Weighted",methodprefix="CT",optwrite=T)
 {
   load(paste0(outprefix,"_",methodprefix,"_valauc_onsubtypes.RData"))
   allaucres$aucres=round(allaucres$aucres,3)
@@ -199,6 +201,36 @@ get_auctable=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
       alltable[i,j]=paste0(alltable[i,j],"(",allaucres$aucreslow[i,j],",",allaucres$aucreshigh[i,j],")")
     }
   }
-  write.csv(alltable,file=paste0(outprefix,"_",methodprefix,"_valauc_onsubtypes.csv"))
+  if (optwrite==T)
+  {
+    write.csv(alltable,file=paste0(outprefix,"_",methodprefix,"_valauc_onsubtypes.csv"))
+  }else
+  {
+    return(alltable)
+  }
+  
 }
 get_auctable(outprefix="../result/PRS1/Weighted",methodprefix="LDpred")
+get_auctable(outprefix="../result/PRS1/TargetEUR",methodprefix="PRScsx")
+get_auctable(outprefix="../result/PRS1/TargetEAS",methodprefix="PRScsx")
+
+#use EUR and EAS tables to get only one (most populations use EUR results; EAS use EAS )
+get_2auctable=function(outprefix1="../result/PRS1/TargetEUR",
+                       outprefix2="../result/PRS1/TargetEAS",
+                       outprefix="../result/PRS1/Target2", #output
+                       methodprefix="PRScsx")
+{
+  alltable1=get_auctable(outprefix=outprefix1,methodprefix=methodprefix,optwrite=F)
+  alltable2=get_auctable(outprefix=outprefix2,methodprefix=methodprefix,optwrite=F)
+  idx=which(rownames(alltable1)=="ASN")
+  alltable=alltable1
+  alltable[idx,]=alltable2[idx,]
+  
+  if (optwrite==T)
+  {
+    write.csv(alltable,file=paste0(outprefix,"_",methodprefix,"_valauc_onsubtypes.csv"))
+  }else
+  {
+    return(alltable)
+  }
+}

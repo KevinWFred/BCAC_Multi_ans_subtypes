@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+#subtype=NULL: canceroutcome; nonNULL:subtype
 .libPaths(c("/data/wangx53",.libPaths()))
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 
@@ -32,7 +33,50 @@ phenoonco$y=NA
 phenoonco$y[which(phenoonco$Behaviour1==1)]=1
 phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
 
-get_pheno.prs=function(prs=prs$V6,famval)
+subtypes=c("LumA","LumB","LumB_HN","Her2E","TripN")
+call_subtype=function(pheno=phenoicogs)
+{
+  pheno$LumA=pheno$LumB=pheno$LumB_HN=pheno$Her2E=pheno$TripN=NA
+  idx=which(is.na(pheno$Behaviour1))
+  pheno$LumA[idx]=pheno$LumB[idx]=pheno$LumB_HN[idx]=pheno$Her2E[idx]=pheno$TripN[idx]=0
+  y.pheno.mis1 <- pheno[,c("ER_status1","PR_status1","HER2_status1","Grade1")]
+  
+  idx.1 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &(y.pheno.mis1[,4]==1|y.pheno.mis1[,4]==2))
+  pheno$LumA[idx.1]=1
+  #define Luminal-B like
+  idx.2 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==1)
+  pheno$LumB[idx.2]=1
+  #for Luminal B HER2 negative-like
+  idx.3 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &y.pheno.mis1[,4]==3)
+  pheno$LumB_HN[idx.3]=1
+  #for HER2 enriched-like
+  idx.4 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==1)
+  pheno$Her2E[idx.4]=1
+  #for Triple negative
+  idx.5 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==0)
+  pheno$TripN[idx.5]=1
+  return(pheno)
+  
+}
+phenoicogs=call_subtype(pheno=phenoicogs)
+phenoonco=call_subtype(pheno=phenoonco)
+
+#validation plink files
+prefix_val1="../result/PRS1/african_onco_validation"
+prefix_val2="../result/PRS1/african_icogs_validation"
+prefix_val3="../result/PRS1/asian_onco_validation"
+prefix_val4="../result/PRS1/euro_onco_validation"
+prefix_val5="../result/PRS1/hispanic_onco_validation"
+validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+
+get_pheno.prs=function(prs=prs$V6,famval,subtype=NULL)
 {
   phenotype=phenoicogs
   if (!all(famval$V2 %in% phenoicogs$ID))
@@ -40,9 +84,17 @@ get_pheno.prs=function(prs=prs$V6,famval)
     phenotype=phenoonco
   }
   phenotype=phenotype[match(famval$V2,phenotype$ID),]
+  if (!is.null(subtype))
+  {
+    phenotype$y=NA
+    phenotype$y[which(phenotype[,subtype]==1)]=1
+    phenotype$y[which(is.na(phenotype$Behaviour1))]=0
+  }else
+  {
+    phenotype$y=famval$V6-1 #cancer
+  }
   pheno.prs=phenotype
   pheno.prs$prs=prs
-  pheno.prs$y=famval$V6-1
   pheno.prs=pheno.prs[,c("ID",paste0("pc",1:10),"age","Behaviour1","y","prs")]
   return(pheno.prs)
 }
@@ -56,8 +108,8 @@ myscale=function(pheno.prs)
 RISCA_AUC=function(pheno.prs)
 {
   set.seed(1000)
+  pheno.prs=pheno.prs[!is.na(pheno.prs$y),]
   pheno.prs=myscale(pheno.prs)
-  
   # roc_obj_pv = roc.binary(status = "y", estimator = "pv",
   #                         variable = "prs",
   #                         confounders = ~EV1+EV2+EV3+EV4+EV5+EV6+
@@ -81,7 +133,7 @@ RISCA_AUC=function(pheno.prs)
 }
 
 AUCBoot = function(data,indices){
-  if (max(data$y)!=1) data$y=data$y-1 #y:1,2-->0,1
+  if (max(data$y,na.rm = T)!=1) data$y=data$y-1 #y:1,2-->0,1
   boot_data = data[indices, ]
   model4 <- glm(y~prs, data=boot_data,family = "binomial")
   predicted4 <- predict(model4,boot_data, type="response")
@@ -90,6 +142,7 @@ AUCBoot = function(data,indices){
 }
 
 AUCadjBoot = function(data,indices){
+  data=data[!is.na(data$y),]
   boot_data = data[indices, ]
   confounders = c(paste0("pc",1:10),"age")
   idx=match(confounders,colnames(data))
@@ -107,7 +160,7 @@ AUCadjBoot = function(data,indices){
 
 #allprs is a list of 5 val PRS dataframe
 #allfamval is a list of 5 val fam dataframe
-get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT")
+get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
 {
   #validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
   #validationscores=c(score_val1,score_val2,score_val3,score_val4,score_val5)
@@ -122,11 +175,11 @@ get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT")
     famval=allfamval[[i]]
     if ("numeric" %in% class(prs))
     {
-      pheno.prs=get_pheno.prs(prs=prs,famval)  #prs should align with famval
+      pheno.prs=get_pheno.prs(prs=prs,famval,subtype = subtype)  #prs should align with famval
     }else
     {
       all(prs[,1]==famval[,1])
-      pheno.prs=get_pheno.prs(prs=prs[,ncol(prs)],famval) #prs should align with famval
+      pheno.prs=get_pheno.prs(prs=prs[,ncol(prs)],famval,subtype = subtype) #prs should align with famval
     }
     
     if (i %in% c(1,2))
@@ -834,7 +887,7 @@ targetEASEASprsfiles=paste0("../result/PRS1/prscsx/targetEAS_EASprs_",basename(v
 PRScsxprs=function(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_asian_onco_tuningPRS.sscore",
                    PRS_EAS_tunfile="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuningPRS.sscore",
                    EURprsfiles=targetEASEURprsfiles,EASprsfiles=targetEASEASprsfiles,
-                   target="EAS")
+                   target="EAS",subtype=NULL)
 {
   #get optimal hyperparameter phi
   PRS_EUR_tun=read.table(PRS_EUR_tunfile,header=T)
@@ -842,6 +895,13 @@ PRScsxprs=function(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_asian
   auc_tun=data.frame(EUR=rep(0,4),EAS=rep(0,4),weighted=rep(0,4))
   w1=w2=rep(0,4)
   phenotype1=phenoonco[match(PRS_EUR_tun$ID,phenoonco$ID),]
+  if (!is.null(subtype))
+  {
+    print(subtype)
+    phenotype1$y=NA
+    phenotype1$y[which(phenotype1[,subtype]==1)]=1
+    phenotype1$y[which(is.na(phenotype1$Behaviour1))]=0
+  }
   for(i in 1:4)
   {
     pheno.prs=cbind.data.frame(phenotype1,prseur=PRS_EUR_tun[,i+1],prseas=PRS_EAS_tun[,i+1])
@@ -875,7 +935,14 @@ PRScsxprs=function(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_asian
     famval=read.table(paste0(validationprefix[i],".fam"))
     allfamval[[i]]=famval
   }
-  Target_PRScsx_val=get_valauc(allprs,allfamval,outprefix=paste0("../result/PRS1/Target",target),methodprefix="PRScsx")
+  if (is.null(subtype))
+  {
+    Target_PRScsx_val=get_valauc(allprs,allfamval,outprefix=paste0("../result/PRS1/Target",target),methodprefix="PRScsx",subtype=subtype)
+  }else
+  {
+    Target_PRScsx_val=get_valauc(allprs,allfamval,outprefix=paste0("../result/PRS_subtype/prscsx/",subtype,"/Target",target),methodprefix="PRScsx",subtype=subtype)
+  }
+  
   
   return(Target_PRScsx_val)
 }
@@ -883,6 +950,11 @@ EASPRScsxprs=PRScsxprs(PRS_EUR_tunfile="../result/PRS1/prscsx/targetEAS_EURprs_a
                    PRS_EAS_tunfile="../result/PRS1/prscsx/targetEAS_EASprs_asian_onco_tuningPRS.sscore",
                    EURprsfiles=targetEASEURprsfiles,EASprsfiles=targetEASEASprsfiles,
                    target="EAS")
+load("../result/PRS1/TargetEAS_PRScsx_valauc.RData")
+asianPRScsx=allres
+load("../result/PRS1/TargetEUR_PRScsx_valauc.RData")
+euroPRScsx=allres
+save(euroCT,asianCT,WeightedCT,euroLDpred,asianLDpred,WeightedLDpred,euroPRScsx,asianPRScsx,file="../result/Run_PRS_BC.RData")
 
 targetEUREURprsfiles=paste0("../result/PRS1/prscsx/targetEUR_EURprs_",basename(validationprefix),"PRS.sscore")
 targetEUREASprsfiles=paste0("../result/PRS1/prscsx/targetEUR_EASprs_",basename(validationprefix),"PRS.sscore")
@@ -898,3 +970,122 @@ EURPRScsx_table=get_auctable(aucres=EURPRScsxprs)
 PRScsx_table=rbind(EASPRScsx_table,EURPRScsx_table)
 rownames(PRScsx_table)=c("TargetEAS","TargetEUR")
 write.csv(PRScsx_table,file="../result/PRS1/prscsx/PRScsx_table.csv")
+
+#CTSLEB
+#results from CTSLEB_super
+CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EAS/EAS_CTSLEB_runsuper_linear_comb.RData",
+       target="EAS",outdir="../result/PRS1/",subtype=NULL)
+{
+  load(superresfile)
+  #find the best PRS from learners
+  auctun=rep(0,6)
+  for (i in 1:6)
+  {
+    auctun[i]=res[[8+i]]$auc[1]
+  }
+  idx_optimal=which.max(auctun)
+  print(paste0("idx_optimal: ",idx_optimal))
+  #including all the prs
+  prsmat=res[[idx_optimal+8]]$allprs
+  allprs=allfamval=list()
+  for (i in 1:5)
+  {
+    famval=read.table(paste0(validationprefix[i],".fam"))
+    allfamval[[i]]=famval
+    idx=match(famval[,1],prsmat[,1])
+    if (any(is.na(idx))) warning("some valiation samples are not in PRS matrix!")
+    prs=prsmat[idx,2]
+    allprs[[i]]=prs
+  }
+  CTsleb=get_valauc(allprs,allfamval,outprefix=paste0(outdir,target),methodprefix="CTSLEB",subtype=subtype)
+}
+EASCTSLEB=read.table("../result/PRS1/EAS_CTSLEB_valauc.txt",header=T)
+
+
+#PRSCSx on subtypes
+PRScsx_subtype=function(subtype="LumA",outfolder="../result/PRS_subtype/prscsx/LumA/")
+{
+  if (!dir.exists(outfolder)) dir.create(outfolder)
+  
+  #Target EAS
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_asian_onco_tuningPRS.sscore
+  prefix1=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/asian_onco_tuning_EUR_pst_eff_a1_b0.5_")
+  get_PRScsxprs_tuning(prefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/asian_onco_tuning_EUR_pst_eff_a1_b0.5_"),bimprefix="../result/PRS1/asian_onco_tuning",outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_asian_onco_tuning"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_asian_onco_tuningPRS.sscore
+  prefix2=prefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/asian_onco_tuning_EAS_pst_eff_a1_b0.5_")
+  get_PRScsxprs_tuning(prefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/asian_onco_tuning_EAS_pst_eff_a1_b0.5_"),bimprefix="../result/PRS1/asian_onco_tuning",outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_asian_onco_tuning"))
+  
+  #get prs on validation
+  prefix_val1="../result/PRS1/african_onco_validation"
+  prefix_val2="../result/PRS1/african_icogs_validation"
+  prefix_val3="../result/PRS1/asian_onco_validation"
+  prefix_val4="../result/PRS1/euro_onco_validation"
+  prefix_val5="../result/PRS1/hispanic_onco_validation"
+  validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_african_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val1,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_african_onco_validation"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_african_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val1,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_african_onco_validation"))
+  
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_african_icogs_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val2,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_african_icogs_validation"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_african_icogs_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val2,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_african_icogs_validation"))
+  
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_asian_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val3,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_asian_onco_validation"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_asian_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val3,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_asian_onco_validation"))
+  
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_euro_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val4,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_euro_onco_validation"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_euro_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val4,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_euro_onco_validation"))
+  
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EURprs_hispanic_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val5,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_hispanic_onco_validation"))
+  #../result/PRS_subtype/prscsx/asian/LumA/targetEAS_EASprs_hispanic_onco_validationPRS.sscore
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val5,outprefix=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_hispanic_onco_validation"))
+  
+  #targetEUR
+  prefix1=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/euro_onco_tuning_EUR_pst_eff_a1_b0.5_")
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix="../result/PRS1/euro_onco_tuning",outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_asian_onco_tuning"))
+  prefix2=prefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/euro_onco_tuning_EAS_pst_eff_a1_b0.5_")
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix="../result/PRS1/euro_onco_tuning",outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_asian_onco_tuning"))
+  
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val1,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_african_onco_validation"))
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val1,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_african_onco_validation"))
+  
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val2,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_african_icogs_validation"))
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val2,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_african_icogs_validation"))
+  
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val3,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_asian_onco_validation"))
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val3,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_asian_onco_validation"))
+  
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val4,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_euro_onco_validation"))
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val4,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_euro_onco_validation"))
+  
+  get_PRScsxprs_tuning(prefix=prefix1,bimprefix=prefix_val5,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_hispanic_onco_validation"))
+  get_PRScsxprs_tuning(prefix=prefix2,bimprefix=prefix_val5,outprefix=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_hispanic_onco_validation"))
+  
+  #get AUC on validation
+  targetEASEURprsfiles=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_",basename(validationprefix),"PRS.sscore")
+  targetEASEASprsfiles=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_",basename(validationprefix),"PRS.sscore")
+  EASPRScsxprs=PRScsxprs(PRS_EUR_tunfile=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EURprs_asian_onco_tuningPRS.sscore"),
+                         PRS_EAS_tunfile=paste0("../result/PRS_subtype/prscsx/asian/",subtype,"/targetEAS_EASprs_asian_onco_tuningPRS.sscore"),
+                         EURprsfiles=targetEASEURprsfiles,EASprsfiles=targetEASEASprsfiles,
+                         target="EAS",subtype=subtype)
+  targetEUREURprsfiles=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_",basename(validationprefix),"PRS.sscore")
+  targetEUREASprsfiles=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_",basename(validationprefix),"PRS.sscore")
+  EURPRScsxprs=PRScsxprs(PRS_EUR_tunfile=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EURprs_asian_onco_tuningPRS.sscore"),
+                         PRS_EAS_tunfile=paste0("../result/PRS_subtype/prscsx/euro/",subtype,"/targetEUR_EASprs_asian_onco_tuningPRS.sscore"),
+                         EURprsfiles=targetEUREURprsfiles,EASprsfiles=targetEUREASprsfiles,
+                         target="EUR",subtype=subtype)
+}
+for (i in 1:length(subtypes))
+{
+  subtype=subtypes[i]
+  print(Sys.time())
+  PRScsx_subtype(subtype=subtype,outfolder=paste0("../result/PRS_subtype/prscsx/",subtype,"/"))
+  print(Sys.time())
+}

@@ -281,7 +281,7 @@ sum_com <- AlignSum(sum_target = sum_Target,
                     sum_ref = sum_EUR)
 
 PRS_farm <- SetParamsFarm(plink19_exec = plink19_exec,
-                          plink2_exec = plink2_exec,threads = 2,mem=32000)
+                          plink2_exec = plink2_exec,threads = 2,mem=64000)
 
 out.prefix <- paste0(outprefix, "_")
 wc_base_vec = PRS_farm$wc_base_vec

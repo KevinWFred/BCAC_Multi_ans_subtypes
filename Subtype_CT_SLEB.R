@@ -102,6 +102,7 @@ for (i in 1:length(pops))
     swarmfile=paste0(basedir,"swarmfile/CT_SLEB_ebscore_",pop,"_",subtype,".swarm")
     configfile=paste0(basedir,"config/CT_SLEB_",pop,"_",subtype,".config")
     ebscoretemplate$V3=configfile
+    ebscoretemplate$V4=subtype
     write.table(ebscoretemplate,file=swarmfile,row.names = F,col.names = F,sep="\t",quote=F)
     cmd=paste0("swarm  -f  ",swarmfile," --module R -g 72 --time=5-00:00:00 --gres=lscratch:72")
     print(cmd)

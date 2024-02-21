@@ -169,6 +169,12 @@ helper_CombinePRS <- function(scores,
   return(prs_mat)
 }
 
+subtype=NULL
+if (length(args)==2)
+{
+  subtype=args[2]
+  print(subtype)
+}
 configfile=args[1] #CT_SLEB_never.config
 #configfile="CT_SLEB_EAS.config"
 config=read.table(configfile)
@@ -293,6 +299,51 @@ colnames(phenoonco)=gsub("PC_","pc",colnames(phenoonco))
 phenoonco$y=NA
 phenoonco$y[which(phenoonco$Behaviour1==1)]=1
 phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
+
+call_subtype=function(pheno=phenoicogs)
+{
+  pheno$LumA=pheno$LumB=pheno$LumB_HN=pheno$Her2E=pheno$TripN=NA
+  idx=which(is.na(pheno$Behaviour1))
+  pheno$LumA[idx]=pheno$LumB[idx]=pheno$LumB_HN[idx]=pheno$Her2E[idx]=pheno$TripN[idx]=0
+  y.pheno.mis1 <- pheno[,c("ER_status1","PR_status1","HER2_status1","Grade1")]
+  
+  idx.1 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &(y.pheno.mis1[,4]==1|y.pheno.mis1[,4]==2))
+  pheno$LumA[idx.1]=1
+  #define Luminal-B like
+  idx.2 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==1)
+  pheno$LumB[idx.2]=1
+  #for Luminal B HER2 negative-like
+  idx.3 <- which((y.pheno.mis1[,1]==1|y.pheno.mis1[,2]==1)
+                 &y.pheno.mis1[,3]==0
+                 &y.pheno.mis1[,4]==3)
+  pheno$LumB_HN[idx.3]=1
+  #for HER2 enriched-like
+  idx.4 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==1)
+  pheno$Her2E[idx.4]=1
+  #for Triple negative
+  idx.5 <- which(y.pheno.mis1[,1]==0&y.pheno.mis1[,2]==0
+                 &y.pheno.mis1[,3]==0)
+  pheno$TripN[idx.5]=1
+  return(pheno)
+  
+}
+phenoicogs=call_subtype(pheno=phenoicogs)
+phenoonco=call_subtype(pheno=phenoonco)
+
+if (!is.null(subtype)) #subtype PRS
+{
+  phenoicogs$y=NA
+  phenoicogs$y[which(phenoicogs[,subtype]==1)]=1
+  phenoicogs$y[which(is.na(phenoicogs$Behaviour1))]=0
+  phenoonco$y=NA
+  phenoonco$y[which(phenoonco[,subtype]==1)]=1
+  phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
+}
+
 idx=match(prs_tune[,1],phenoonco$ID)
 phenotype1=phenoonco[idx,]
 for(p_ind in 1:n.total.prs){
@@ -346,85 +397,12 @@ colnames(scores_eb)
 # [23] "clump_r2_0.8_ws_62.5_EB_target"   "clump_r2_0.8_ws_62.5_EB_ref"     
 # [25] "clump_r2_0.8_ws_125_EB_target"    "clump_r2_0.8_ws_125_EB_ref" 
 outfile_prefix <- helper_prefix(out_prefix = outprefix,
-                                ebayes = TRUE)
-temp.dir <- paste0(out_dir,"temp/")
-this_prs_p_other_ <- paste0(temp.dir, outfile_prefix, "prs_p_other_")
-#testbfile including tuning and validation
-CalculateEBEffectSize_onall <- function(bfile,
-                                         testbfile, #for testing PRS
-                                  snp_ind,
-                                  plink_list,
-                                  memory = 8000,
-                                  threads = 2,
-                                  out_prefix,
-                                  results_dir,
-                                  params_farm = as.null()){
-  print("Executing CalculateEBEffectSize() ... ")
-  scores <- plink_list[[1]]
-  clump_info <- plink_list[[3]]
-  
-  best_snp_set <- GetSNPSet(snp_ind = snp_ind,
-                            scores = scores,
-                            clump_info = clump_info)
-  
-  clump_info_post <- EBayesPostMean(x = clump_info,
-                                    y = best_snp_set)
-  post_coef_mat <- cbind(clump_info_post$BETA_EB_target,
-                         clump_info_post$BETA_EB_ref)
-  colnames(post_coef_mat) <- c("EB_target","EB_ref")
-  
-  plinklist_eb <- PreparePlinkFileEBayes(snp_list = snp_list,
-                                         clump_info = clump_info,
-                                         post_clump_info = clump_info_post,
-                                         post_beta = post_coef_mat,
-                                         results_dir = results_dir)
-  
-  assign("best_snps_set", best_snp_set, envir = .GlobalEnv)
-  assign("unique_infor_post", clump_info_post, envir = .GlobalEnv)
-  assign("plink_list_eb", plinklist_eb, envir = .GlobalEnv)
-  
-  scores_eb <- plinklist_eb[[1]]
-  score_eb_file <- as.character(unlist(plinklist_eb["score_eb_file"]))
-  write.table(scores_eb,
-              file = score_eb_file,
-              row.names = F,
-              col.names = F,
-              quote=F)
-  p_values_eb <- plinklist_eb[[2]]
-  
-  ebayes_prs <- PRSscoreEBayes(bfile = testbfile, #changed to compute score on testbfile
-                               eb_plink_list = plinklist_eb,
-                               plink_list = plink_list,
-                               results_dir = results_dir,
-                               out_prefix = out_prefix,
-                               params_farm = params_farm)
-  
-  assign("scores_eb", scores_eb, envir = .GlobalEnv)
-  assign("score_eb_file", score_eb_file, envir = .GlobalEnv)
-  assign("p_values_eb", p_values_eb, envir = .GlobalEnv)
-  
-  return(ebayes_prs)
-  
-}
-
-this_prs_p_other_ <- helper_ebscore_loop(params_farm = params_farm, 
-                                         plink2_exec = plink2_exec, bfile = bfile, eb_plink_list = eb_plink_list, 
-                                         plink_list = plink_list, pthres = pthres, threads = threads, 
-                                         memory = memory, results_dir = results_dir, out_prefix = out_prefix)
-scores_eb <- eb_plink_list[[1]]
-this_prs_mat <- helper_CombinePRS(scores = scores_eb, pthres = pthres, 
+                                 ebayes = TRUE)
+this_prs_p_other_=paste0(temp.dir, outfile_prefix, "prs_p_other_")
+#combine to get the PRS
+prs_mat_eb <- helper_CombinePRS(scores = scores_eb, pthres = pthres, 
                                   prs_p_other_ = this_prs_p_other_)
 print("prs_mat_eb object created")
-
-prs_mat_eb <- CalculateEBEffectSize_onall(bfile = Target_ref_plinkfile,
-                                          testbfile = Target_test_plinkfile,
-                                          snp_ind = best_snps,
-                                          plink_list = plink_list,
-                                          out_prefix = outprefix,
-                                          results_dir = out_dir,
-                                          params_farm = PRS_farm)
-
-
 
 PRSTrainValSplit <- function(x,
                              n = 0.50,famtrain=NULL,famtest=NULL,corcutoff=0.98) {
@@ -523,7 +501,8 @@ get_pheno_test=function(famtest)
 phenotest=get_pheno_test(famtest)
 idx=match(famtest[,1],phenotest$ID)
 phenotype2=phenotest[idx,]
-
+phenotype1=phenotype1[,match(colnames(phenotype2),colnames(phenotype1))]
+phenotype=rbind(phenotype1,phenotype2)
 valdat=cbind.data.frame(prs_valid_sl)
 set.seed(1000)
 # sl <- SuperLearner(Y = phenotype1$y, 
@@ -602,19 +581,19 @@ getauc=function(mymodel=sl_nonl)
   y_pred_val <- predict(mymodel,valdat, onlySL = TRUE)[[1]]
   pheno.prs=cbind.data.frame(phenotype2,prs=y_pred_val[[1]])
   allprs=data.frame(GWAS_ID=c(famtrain$V1,famtest$V1),prs=c(y_pred_tun,y_pred_val))
-  pheno1.prs=merge(phenotype,allprs,by="GWAS_ID")
+  pheno1.prs=merge(phenotype,allprs,by.x="ID",by.y="GWAS_ID")
   #model1 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno1.prs,family = "binomial")
   model1 <- glm(y~prs, data=pheno1.prs,family = "binomial")
   predicted1 <- predict(model1,pheno1.prs, type="response")
   auc$all=as.numeric(auc(pheno1.prs$y,predicted1,quiet=T))
   
-  pheno2.prs=pheno1.prs[pheno1.prs$GWAS_ID %in% famtrain[,1],]
+  pheno2.prs=pheno1.prs[pheno1.prs$ID %in% famtrain[,1],]
   #model2 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno2.prs,family = "binomial")
   model2 <- glm(y~prs, data=pheno2.prs,family = "binomial")
   predicted2 <- predict(model2,pheno2.prs, type="response")
   auc$tun=as.numeric(auc(pheno2.prs$y,predicted2,quiet=T))
   
-  pheno3.prs=pheno1.prs[pheno1.prs$GWAS_ID %in% famtest[,1],]
+  pheno3.prs=pheno1.prs[pheno1.prs$ID %in% famtest[,1],]
   #model3 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno3.prs,family = "binomial")
   model3 <- glm(y~prs, data=pheno3.prs,family = "binomial")
   predicted3 <- predict(model3,pheno3.prs, type="response")
@@ -630,11 +609,11 @@ getauc=function(mymodel=sl_nonl)
     auc=as.numeric(auc(boot_data$y,predicted4,quiet=T))
     return(c(auc))
   }
-  # boot_auc = boot(data =pheno3.prs, statistic = AUCBoot, R = 10000)
-  # tmp=boot.ci(boot_auc,type="bca")
-  # auc_val$auc_low=tmp$bca[4]
-  # auc_val$auc_high=tmp$bca[5]
-  # print(auc_val)
+  boot_auc = boot(data =pheno3.prs, statistic = AUCBoot, R = 1000)
+  tmp=boot.ci(boot_auc,type="perc")
+  auc_val$auc_low=tmp$percent[4]
+  auc_val$auc_high=tmp$percent[5]
+  print(auc_val)
   return(list(auc=auc,auc_val=auc_val,allprs=allprs))
   
 }
@@ -663,3 +642,4 @@ save(res,file=paste0(out_dir,outprefix,"_runsuper_linear_comb.RData"))
 #runsuper_new1.RData: AUC adjust for all covariates
 #runsuper_prs.RData: AUC adjust for nothing
 #runsuper_linear.RData: linear learner
+#./run_CT_SLEB_super.R CT_SLEB_EAS.config
