@@ -160,16 +160,101 @@ AUCadjBoot = function(data,indices){
 
 #allprs is a list of 5 val PRS dataframe
 #allfamval is a list of 5 val fam dataframe
+# get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
+# {
+#   #validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+#   #validationscores=c(score_val1,score_val2,score_val3,score_val4,score_val5)
+#   
+#   CTauc_val=data.frame(matrix(NA,nrow=6,ncol=6))
+#   colnames(CTauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
+#   rownames(CTauc_val)=c("AUC","AUClow","AUChigh","AUCadj","AUCadjlow","AUCadjhigh")
+#   afrpheno.prs=NULL
+#   for (i in 1:5)
+#   {
+#     prs=allprs[[i]]
+#     famval=allfamval[[i]]
+#     if ("numeric" %in% class(prs))
+#     {
+#       pheno.prs=get_pheno.prs(prs=prs,famval,subtype = subtype)  #prs should align with famval
+#     }else
+#     {
+#       all(prs[,1]==famval[,1])
+#       pheno.prs=get_pheno.prs(prs=prs[,ncol(prs)],famval,subtype = subtype) #prs should align with famval
+#     }
+#     
+#     if (i %in% c(1,2))
+#     {
+#       afrpheno.prs=rbind(afrpheno.prs,pheno.prs)
+#     }
+#     if (length(unique(pheno.prs$y[!is.na(pheno.prs$y)]))>1) #for Her2E,icogsafrican, there is no cases
+#     {
+#       model1 <- glm(I(y==1)~prs, data=pheno.prs,family = "binomial")
+#       predicted1 <- predict(model1,pheno.prs, type="response")
+#       CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+#       boot_auc = boot(data =pheno.prs, statistic = AUCBoot, R = 1000)
+#       tmp=boot.ci(boot_auc,type="perc")
+#       CTauc_val[2,i]=tmp$percent[4] #low
+#       CTauc_val[3,i]=tmp$percent[5] #high
+#       CTauc_val[4,i]=RISCA_AUC(pheno.prs)
+#       boot_aucadj = boot(data =pheno.prs, statistic = AUCadjBoot, R = 1000)
+#       tmp=boot.ci(boot_aucadj,type="perc")
+#       CTauc_val[5,i]=tmp$percent[4] #adjlow
+#       CTauc_val[6,i]=tmp$percent[5] #adjhigh
+#     }
+#     
+#   }
+#   
+#   model1 <- glm(I(y==1)~prs, data=afrpheno.prs,family = "binomial")
+#   predicted1 <- predict(model1,afrpheno.prs, type="response")
+#   CTauc_val[1,6]=as.numeric(pROC::auc(afrpheno.prs$y,predicted1,quiet=T))
+#   boot_auc = boot(data =afrpheno.prs, statistic = AUCBoot, R = 1000)
+#   tmp=boot.ci(boot_auc,type="perc")
+#   CTauc_val[2,6]=tmp$percent[4] #low
+#   CTauc_val[3,6]=tmp$percent[5] #high
+#   CTauc_val[4,6]=RISCA_AUC(afrpheno.prs)
+#   boot_aucadj = boot(data =afrpheno.prs, statistic = AUCadjBoot, R = 1000)
+#   tmp=boot.ci(boot_aucadj,type="perc")
+#   CTauc_val[5,6]=tmp$percent[4] #adjlow
+#   CTauc_val[6,6]=tmp$percent[5] #adjhigh
+#   write.table(CTauc_val,file=paste0(outprefix,"_",methodprefix,"_valauc.txt"),row.names=F,sep="\t",quote=F)
+#   allres=list(auc=CTauc_val,allprs=allprs,allfamval=allfamval)
+#   save(allres,file=paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+#   return(allres)
+# }
+
+#combine icogs/onco african
+#allprs is a list of 4 val PRS dataframe
+#allfamval is a list of 4 val fam dataframe
 get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
 {
   #validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
   #validationscores=c(score_val1,score_val2,score_val3,score_val4,score_val5)
-  
-  CTauc_val=data.frame(matrix(NA,nrow=6,ncol=6))
-  colnames(CTauc_val)=c("onco_african","icogs_african","onco_asian","onco_euro","onco_hispanic","african")
+  if (length(allprs)==5)
+  {
+    allprs1=list()
+    if (class(allprs[[1]])!="numeric")
+    {
+      allprs1[[1]]=rbind(allprs[[1]],allprs[[2]])
+    }else
+    {
+      allprs1[[1]]=c(allprs[[1]],allprs[[2]])
+    }
+    allprs1[[2]]=allprs[[3]]
+    allprs1[[3]]=allprs[[4]]
+    allprs1[[4]]=allprs[[5]]
+    allfamval1=list()
+    allfamval1[[1]]=rbind(allfamval[[1]],allfamval[[2]])
+    allfamval1[[2]]=allfamval[[3]]
+    allfamval1[[3]]=allfamval[[4]]
+    allfamval1[[4]]=allfamval[[5]]
+    allprs=allprs1
+    allfamval=allfamval1
+  }
+  CTauc_val=data.frame(matrix(NA,nrow=6,ncol=4))
+  colnames(CTauc_val)=c("african","onco_asian","onco_euro","onco_hispanic")
   rownames(CTauc_val)=c("AUC","AUClow","AUChigh","AUCadj","AUCadjlow","AUCadjhigh")
-  afrpheno.prs=NULL
-  for (i in 1:5)
+
+  for (i in 1:4)
   {
     prs=allprs[[i]]
     famval=allfamval[[i]]
@@ -182,42 +267,28 @@ get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
       pheno.prs=get_pheno.prs(prs=prs[,ncol(prs)],famval,subtype = subtype) #prs should align with famval
     }
     
-    if (i %in% c(1,2))
+    if (length(unique(pheno.prs$y[!is.na(pheno.prs$y)]))>1)
     {
-      afrpheno.prs=rbind(afrpheno.prs,pheno.prs)
+      model1 <- glm(I(y==1)~prs, data=pheno.prs,family = "binomial")
+      predicted1 <- predict(model1,pheno.prs, type="response")
+      CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
+      boot_auc = boot(data =pheno.prs, statistic = AUCBoot, R = 1000)
+      tmp=boot.ci(boot_auc,type="perc")
+      CTauc_val[2,i]=tmp$percent[4] #low
+      CTauc_val[3,i]=tmp$percent[5] #high
+      CTauc_val[4,i]=RISCA_AUC(pheno.prs)
+      boot_aucadj = boot(data =pheno.prs, statistic = AUCadjBoot, R = 1000)
+      tmp=boot.ci(boot_aucadj,type="perc")
+      CTauc_val[5,i]=tmp$percent[4] #adjlow
+      CTauc_val[6,i]=tmp$percent[5] #adjhigh
     }
-    model1 <- glm(I(y==1)~prs, data=pheno.prs,family = "binomial")
-    predicted1 <- predict(model1,pheno.prs, type="response")
-    CTauc_val[1,i]=as.numeric(pROC::auc(pheno.prs$y,predicted1,quiet=T))
-    boot_auc = boot(data =pheno.prs, statistic = AUCBoot, R = 1000)
-    tmp=boot.ci(boot_auc,type="perc")
-    CTauc_val[2,i]=tmp$percent[4] #low
-    CTauc_val[3,i]=tmp$percent[5] #high
-    CTauc_val[4,i]=RISCA_AUC(pheno.prs)
-    boot_aucadj = boot(data =pheno.prs, statistic = AUCadjBoot, R = 1000)
-    tmp=boot.ci(boot_aucadj,type="perc")
-    CTauc_val[5,i]=tmp$percent[4] #adjlow
-    CTauc_val[6,i]=tmp$percent[5] #adjhigh
   }
   
-  model1 <- glm(I(y==1)~prs, data=afrpheno.prs,family = "binomial")
-  predicted1 <- predict(model1,afrpheno.prs, type="response")
-  CTauc_val[1,6]=as.numeric(pROC::auc(afrpheno.prs$y,predicted1,quiet=T))
-  boot_auc = boot(data =afrpheno.prs, statistic = AUCBoot, R = 1000)
-  tmp=boot.ci(boot_auc,type="perc")
-  CTauc_val[2,6]=tmp$percent[4] #low
-  CTauc_val[3,6]=tmp$percent[5] #high
-  CTauc_val[4,6]=RISCA_AUC(afrpheno.prs)
-  boot_aucadj = boot(data =afrpheno.prs, statistic = AUCadjBoot, R = 1000)
-  tmp=boot.ci(boot_aucadj,type="perc")
-  CTauc_val[5,6]=tmp$percent[4] #adjlow
-  CTauc_val[6,6]=tmp$percent[5] #adjhigh
   write.table(CTauc_val,file=paste0(outprefix,"_",methodprefix,"_valauc.txt"),row.names=F,sep="\t",quote=F)
   allres=list(auc=CTauc_val,allprs=allprs,allfamval=allfamval)
   save(allres,file=paste0(outprefix,"_",methodprefix,"_valauc.RData"))
   return(allres)
 }
-
 
 # #for EUR
 # metafile="../result/PRS1/euro_training_sumstats.txt"
@@ -973,7 +1044,7 @@ write.csv(PRScsx_table,file="../result/PRS1/prscsx/PRScsx_table.csv")
 
 #CTSLEB
 #results from CTSLEB_super
-CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EAS/EAS_CTSLEB_runsuper_linear_comb.RData",
+CTSLEBprs=function(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EAS/EAS_CTSLEB_runsuper_linear_comb.RData",
        target="EAS",outdir="../result/PRS1/",subtype=NULL)
 {
   load(superresfile)
@@ -999,8 +1070,14 @@ CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EA
   }
   CTsleb=get_valauc(allprs,allfamval,outprefix=paste0(outdir,target),methodprefix="CTSLEB",subtype=subtype)
 }
-EASCTSLEB=read.table("../result/PRS1/EAS_CTSLEB_valauc.txt",header=T)
-
+EASCTslebprs=read.table("../result/PRS1/EAS_CTSLEB_valauc.txt",header=T)
+EASCTsleb_table=get_auctable(aucres=EASCTslebprs)
+write.csv(EASCTsleb_table,file="../result/PRS1/ctsleb/EASCTsleb_table.csv",row.names = F)
+CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EUR/EUR_CTSLEB_runsuper_linear_comb.RData",
+                   target="EUR",outdir="../result/PRS1/",subtype=NULL)
+EURCTslebprs=read.table("../result/PRS1/EUR_CTSLEB_valauc.txt",header=T)
+EURCTsleb_table=get_auctable(aucres=EURCTslebprs)
+write.csv(EURCTsleb_table,file="../result/PRS1/ctsleb/EURCTsleb_table.csv",row.names = F)
 
 #PRSCSx on subtypes
 PRScsx_subtype=function(subtype="LumA",outfolder="../result/PRS_subtype/prscsx/LumA/")
@@ -1082,7 +1159,7 @@ PRScsx_subtype=function(subtype="LumA",outfolder="../result/PRS_subtype/prscsx/L
                          EURprsfiles=targetEUREURprsfiles,EASprsfiles=targetEUREASprsfiles,
                          target="EUR",subtype=subtype)
 }
-for (i in 1:length(subtypes))
+for (i in 5:length(subtypes))
 {
   subtype=subtypes[i]
   print(Sys.time())

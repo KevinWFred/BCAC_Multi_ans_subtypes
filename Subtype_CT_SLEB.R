@@ -90,7 +90,26 @@ for (i in 1:length(pops))
     #system("sleep 2")
   }
 }
-
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_euro_LumA.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265505
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_euro_LumB.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265511
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_euro_LumB_HN.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265517
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_euro_Her2E.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265522
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_euro_TripN.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265528
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_asian_LumA.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265533
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_asian_LumB.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265539
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_asian_LumB_HN.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265544
+# [1] "swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_score_asian_Her2E.swarm --module R -g 72 --time=5-00:00:00 --gres=lscratch:72"
+# 20265549
+# [1] template
+# 20265555
 
 ebscoretemplate=read.table("/data/BB_Bioinformatics/Kevin/BCAC/code/CTSLEB_EAS_runEBscore.swarm")
 for (i in 1:length(pops))
@@ -106,7 +125,24 @@ for (i in 1:length(pops))
     write.table(ebscoretemplate,file=swarmfile,row.names = F,col.names = F,sep="\t",quote=F)
     cmd=paste0("swarm  -f  ",swarmfile," --module R -g 72 --time=5-00:00:00 --gres=lscratch:72")
     print(cmd)
-    #system(cmd)
-    #system("sleep 2")
+    system(cmd)
+    system("sleep 2")
   }
 }
+
+#super 
+tmp=NULL
+code="/data/BB_Bioinformatics/Kevin/BCAC/code/run_CT_SLEB_super.R"
+for (i in 1:length(pops))
+{
+  pop=pops[i]
+  for (j in 1:length(subtypes))
+  {
+    subtype=subtypes[j]
+    configfile=paste0(basedir,"config/CT_SLEB_",pop,"_",subtype,".config")
+    tmp=rbind(tmp,data.frame(code=code,config=configfile,subtype=subtype))
+  }
+}
+write.table(tmp,file=paste0(basedir,"swarmfile/CT_SLEB_super_subtype.swarm"),row.names = F,col.names = F,sep=" ",quote=F)
+cmd="swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_super_subtype.swarm --module R -g 72 --time=3-00:00:00 --gres=lscratch:72"
+system(cmd)

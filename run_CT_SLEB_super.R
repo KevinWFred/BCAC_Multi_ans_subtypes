@@ -643,3 +643,4 @@ save(res,file=paste0(out_dir,outprefix,"_runsuper_linear_comb.RData"))
 #runsuper_prs.RData: AUC adjust for nothing
 #runsuper_linear.RData: linear learner
 #./run_CT_SLEB_super.R CT_SLEB_EAS.config
+#./run_CT_SLEB_super.R CT_SLEB_EUR.config
