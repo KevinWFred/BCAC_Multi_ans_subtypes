@@ -1166,3 +1166,53 @@ for (i in 5:length(subtypes))
   PRScsx_subtype(subtype=subtype,outfolder=paste0("../result/PRS_subtype/prscsx/",subtype,"/"))
   print(Sys.time())
 }
+
+#PROSPER result
+plink2score=function(bimprefix,scorefile,outprefix)
+{
+  scoredat=as.data.frame(fread(scorefile,header=T))
+  cmd=paste0(plink2," --pfile ",bimprefix," --score-col-nums ",ncol(scoredat),
+             " --score ",scorefile," cols=+scoresums,-scoreavgs header no-mean-imputation ",
+             " --out ",outprefix," --memory 64000 --threads 8")
+  system(cmd)
+}
+
+PROSPERprs=function(scorefile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/prosper/PROSPER/after_ensemble_EAS/PROSPER_prs_file.txt",
+                   target="EAS",outdir="../result/PRS1/prosper/",subtype=NULL)
+{
+  score=as.data.frame(fread(scorefile,header=T))
+  scorefile1=paste0(outdir,target,"_prosper_score.txt")
+  fwrite(score[,c("rsid","a1","weight")],file=scorefile1,row.names = F,sep="\t",quote=F)
+  score_val1=paste0(outdir,basename(prefix_val1))
+  plink2score(bimprefix=prefix_val1,scorefile=scorefile1,outprefix=score_val1)
+  score_val2=paste0(outdir,basename(prefix_val2))
+  plink2score(bimprefix=prefix_val2,scorefile=scorefile1,outprefix=score_val2)
+  score_val3=paste0(outdir,basename(prefix_val3))
+  plink2score(bimprefix=prefix_val3,scorefile=scorefile1,outprefix=score_val3)
+  score_val4=paste0(outdir,basename(prefix_val4))
+  plink2score(bimprefix=prefix_val4,scorefile=scorefile1,outprefix=score_val4)
+  score_val5=paste0(outdir,basename(prefix_val5))
+  plink2score(bimprefix=prefix_val5,scorefile=scorefile1,outprefix=score_val5)
+  validationscoreprefix=c(score_val1,score_val2,score_val3,score_val4,score_val5)
+  allprs=allfamval=list()
+  for (i in 1:5)
+  {
+    famval=read.table(paste0(validationprefix[i],".fam"))
+    allfamval[[i]]=famval
+    prsmat=as.data.frame(fread(paste0(validationscoreprefix[i],".sscore"),header=T))
+    idx=match(famval[,1],prsmat[,1])
+    if (any(is.na(idx))) warning("some valiation samples are not in PRS matrix!")
+    prs=prsmat[idx,ncol(prsmat)]
+    allprs[[i]]=prs
+  }
+  prospers=get_valauc(allprs,allfamval,outprefix=paste0(outdir,target),methodprefix="PROSPERS",subtype=subtype)
+}
+PROSPERprs(scorefile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/prosper/PROSPER/after_ensemble_EUR/PROSPER_prs_file.txt",
+                    target="EUR",outdir="../result/PRS1/prosper/",subtype=NULL)
+EASPROSPERprs=read.table("../result/PRS1/prosper/EAS_PROSPERS_valauc.txt",header=T)
+EURPROSPERprs=read.table("../result/PRS1/prosper/EUR_PROSPERS_valauc.txt",header=T)
+EASPROSPER_table=get_auctable(aucres=EASPROSPERprs)
+EURPROSPER_table=get_auctable(aucres=EURPROSPERprs)
+PROSPER_table=rbind(EASPROSPER_table,EURPROSPER_table)
+rownames(PROSPER_table)=c("TargetEAS","TargetEUR")
+write.csv(PROSPER_table,file="../result/PRS1/prosper/PROSPER_table.csv")  
