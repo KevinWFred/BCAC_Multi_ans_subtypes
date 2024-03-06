@@ -284,9 +284,11 @@ get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
     }
   }
   
-  write.table(CTauc_val,file=paste0(outprefix,"_",methodprefix,"_valauc.txt"),row.names=F,sep="\t",quote=F)
+  outprefix1=paste0(outprefix,"_",methodprefix)
+  if (!is.null(subtype)) outprefix1=paste0(outprefix1,"_",subtype)
+  write.table(CTauc_val,file=paste0(outprefix1,"_valauc.txt"),row.names=F,sep="\t",quote=F)
   allres=list(auc=CTauc_val,allprs=allprs,allfamval=allfamval)
-  save(allres,file=paste0(outprefix,"_",methodprefix,"_valauc.RData"))
+  save(allres,file=paste0(outprefix1,"_valauc.RData"))
   return(allres)
 }
 
@@ -1079,6 +1081,44 @@ EURCTslebprs=read.table("../result/PRS1/EUR_CTSLEB_valauc.txt",header=T)
 EURCTsleb_table=get_auctable(aucres=EURCTslebprs)
 write.csv(EURCTsleb_table,file="../result/PRS1/ctsleb/EURCTsleb_table.csv",row.names = F)
 
+#use EUR/EAS tuning
+CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EUR/EUREAS_CTSLEB_runsuper_linear_comb1.RData",
+          target="EUREAS",outdir="../result/PRS1/",subtype=NULL)
+EUREASCTslebprs=read.table("../result/PRS1/EUREAS_CTSLEB_valauc.txt",header=T)
+EUREASCTsleb_table=get_auctable(aucres=EUREASCTslebprs)
+write.csv(EUREASCTsleb_table,file="../result/PRS1/ctsleb/EUREASCTsleb_table.csv",row.names = F)
+
+CTSLEBprs_wrap=function(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/asian/LumA/asian_LumA_runsuper_linear_comb1.RData",
+                           target="EAS",outdir="../result/PRS_subtype/ctsleb/",subtype="LumA",methodprefix="CTSLEB")
+{
+  CTSLEBprs(superresfile=superresfile,target=target,outdir=outdir,subtype=subtype)
+  outprefix1=paste0(outdir,target,"_",methodprefix)
+  if (!is.null(subtype)) outprefix1=paste0(outprefix1,"_",subtype)
+  aucval=read.table(paste0(outprefix1,"_valauc.txt"),header=T)
+  aucval_table=get_auctable(aucres=aucval)
+  write.csv(aucval_table,file=paste0(outprefix1,"_table.csv"))
+}
+
+targets=c("EUR","EAS")
+for (i in 1:length(targets))
+{
+  target=targets[i]
+  for (j in 1:length(subtypes))
+  {
+    #superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/asian/LumA/asian_LumA_runsuper_linear_comb1.RData"
+    subtype=subtypes[j]
+    print(paste0(target,"_",subtype))
+    if (target=="EUR")
+    {
+      superresfile=paste0("/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/euro/",subtype,"/","euro_",subtype,"_runsuper_linear_comb1.RData")
+    }else
+    {
+      superresfile=paste0("/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/asian/",subtype,"/","asian_",subtype,"_runsuper_linear_comb1.RData")
+    }
+    CTSLEBprs_wrap(superresfile=superresfile,target=target,subtype=subtype)
+  }
+}
+  
 #PRSCSx on subtypes
 PRScsx_subtype=function(subtype="LumA",outfolder="../result/PRS_subtype/prscsx/LumA/")
 {

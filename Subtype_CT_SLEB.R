@@ -130,7 +130,7 @@ for (i in 1:length(pops))
   }
 }
 
-#super 
+#super,target EAS or EUR
 tmp=NULL
 code="/data/BB_Bioinformatics/Kevin/BCAC/code/run_CT_SLEB_super.R"
 for (i in 1:length(pops))
@@ -140,9 +140,23 @@ for (i in 1:length(pops))
   {
     subtype=subtypes[j]
     configfile=paste0(basedir,"config/CT_SLEB_",pop,"_",subtype,".config")
-    tmp=rbind(tmp,data.frame(code=code,config=configfile,subtype=subtype))
+    tmp=rbind(tmp,data.frame(code=code,config=configfile,opt_tuning2=0,subtype=subtype))
   }
 }
 write.table(tmp,file=paste0(basedir,"swarmfile/CT_SLEB_super_subtype.swarm"),row.names = F,col.names = F,sep=" ",quote=F)
-cmd="swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_super_subtype.swarm --module R -g 72 --time=3-00:00:00 --gres=lscratch:72"
+cmd="swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_super_subtype.swarm --module R -g 32 --time=3-00:00:00 --gres=lscratch:32"
+system(cmd)
+
+#super,target EAS or EUR
+tmp=NULL
+pop="euro"
+code="/data/BB_Bioinformatics/Kevin/BCAC/code/run_CT_SLEB_super.R"
+for (j in 1:length(subtypes))
+{
+  subtype=subtypes[j]
+  configfile=paste0(basedir,"config/CT_SLEB_",pop,"_",subtype,".config")
+  tmp=rbind(tmp,data.frame(code=code,config=configfile,opt_tuning2=1,subtype=subtype))
+}
+write.table(tmp,file=paste0(basedir,"swarmfile/CT_SLEB_super_subtype_2tuning.swarm"),row.names = F,col.names = F,sep=" ",quote=F)
+cmd="swarm  -f  /data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/swarmfile/CT_SLEB_super_subtype_2tuning.swarm --module R -g 32 --time=3-00:00:00 --gres=lscratch:32"
 system(cmd)

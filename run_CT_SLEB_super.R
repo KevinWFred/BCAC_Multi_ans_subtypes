@@ -169,14 +169,13 @@ helper_CombinePRS <- function(scores,
   return(prs_mat)
 }
 
-subtype=NULL
-if (length(args)==2)
-{
-  subtype=args[2]
-  print(subtype)
-}
+#arg1:configfile,must have
+#arg2:opt_tuning2,1:to use EUR and EAS tuning,optional
+#arg3:subtype:if use arg3 must have arg2 as well.
+
 configfile=args[1] #CT_SLEB_never.config
-#configfile="CT_SLEB_EAS.config"
+#configfile="CT_SLEB_EUR.config"
+#configfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/config/CT_SLEB_euro_LumA.config"
 config=read.table(configfile)
 if (!file.exists(configfile)) stop("no input file.")
 #if (nrow(config)!=9 || ncol(config)!=2) stop("input file format is not right")
@@ -195,8 +194,23 @@ out_dir = config[6,2] # "../result/CTSLEB_Never_swarm/"
 outprefix <- config[7,2] #"EASnever_CTSLEB"
 plink19_exec=config[8,2] #"/usr/local/apps/plink/1.9/plink"
 plink2_exec=config[9,2] #"/usr/local/apps/plink/2.3-alpha/plink2"
-#famtrainfile=config[10,2] # /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/EAS_never_train1.fam
-#famtestfile=config[11,2] # /data/BB_Bioinformatics/Kevin/PRS_EASLC/result/EAS_never_test1.fam
+
+opt_tuning2=0
+#use both EUR and EAS for tuning
+if(length(args)>=2)
+{
+  opt_tuning2=as.integer(args[2])
+  print(paste0("opt_tuning2:",opt_tuning2))
+}
+
+subtype=NULL
+if (length(args)>=3)
+{
+  subtype=as.character(args[3])
+  print(subtype)
+}
+
+
 
 #used for split tuning/validation data
 famtrain=read.table(paste0(Target_ref_plinkfile,".fam"))
@@ -461,6 +475,18 @@ PRSTrainValSplit <- function(x,
                       "validate" = super_validate_clean)
   return(return_list)
 }
+
+if (opt_tuning2!=0)
+{
+  famtrain=read.table("../result/PRS1/tuning2.fam")
+  outprefix="EUREAS_CTSLEB"
+  if (!is.null(subtype))
+  {
+    outprefix=paste0(outprefix,"_",subtype)
+  }
+  train_val_list <- PRSTrainValSplit(x = prs_mat_eb,famtrain = famtrain,famtest=famtest)
+  
+}
 train_val_list <- PRSTrainValSplit(x = prs_mat_eb,famtrain = famtrain,famtest=famtest)
 prs_tune_sl <- train_val_list[[1]]
 prs_valid_sl <- train_val_list[[2]]
@@ -481,7 +507,10 @@ rownames(prs_tune_sl)=famtrain$V1
 idx=match(famtrain[,1],phenoonco$ID)
 phenotype1=phenoonco[idx,]
 traindat=cbind.data.frame(prs_tune_sl)
-
+#for subtypes, there are missing outcomes
+idx=is.na(phenotype1$y)
+phenotype1=phenotype1[!idx,]
+traindat=traindat[!idx,]
 get_pheno_test=function(famtest)
 {
   phenotype=phenoicogs[,c("ID",paste0("pc",1:10),"age","Behaviour1","y")]
@@ -502,7 +531,7 @@ phenotest=get_pheno_test(famtest)
 idx=match(famtest[,1],phenotest$ID)
 phenotype2=phenotest[idx,]
 phenotype1=phenotype1[,match(colnames(phenotype2),colnames(phenotype1))]
-phenotype=rbind(phenotype1,phenotype2)
+#phenotype=rbind(phenotype1,phenotype2)
 valdat=cbind.data.frame(prs_valid_sl)
 set.seed(1000)
 # sl <- SuperLearner(Y = phenotype1$y, 
@@ -575,17 +604,18 @@ sl_linear6 <- SuperLearner(Y = phenotype1$y,
 #get auc for tuning/validaiton/all
 getauc=function(mymodel=sl_nonl)
 {
-  auc=data.frame(tun=0,val=0,all=0)
+  auc=data.frame(tun=0,val=0)
   y_pred_tun <- predict(mymodel,traindat, onlySL = TRUE)[[1]]
   
   y_pred_val <- predict(mymodel,valdat, onlySL = TRUE)[[1]]
-  pheno.prs=cbind.data.frame(phenotype2,prs=y_pred_val[[1]])
-  allprs=data.frame(GWAS_ID=c(famtrain$V1,famtest$V1),prs=c(y_pred_tun,y_pred_val))
-  pheno1.prs=merge(phenotype,allprs,by.x="ID",by.y="GWAS_ID")
-  #model1 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno1.prs,family = "binomial")
-  model1 <- glm(y~prs, data=pheno1.prs,family = "binomial")
-  predicted1 <- predict(model1,pheno1.prs, type="response")
-  auc$all=as.numeric(auc(pheno1.prs$y,predicted1,quiet=T))
+  #allprs=data.frame(GWAS_ID=c(famtrain$V1,famtest$V1),prs=c(y_pred_tun,y_pred_val))
+  #famtest includes famtrain
+  allprs=data.frame(GWAS_ID=c(famtest$V1),prs=c(y_pred_val))
+  pheno1.prs=merge(phenotype2,allprs,by.x="ID",by.y="GWAS_ID")
+  # #model1 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno1.prs,family = "binomial")
+  # model1 <- glm(y~prs, data=pheno1.prs,family = "binomial")
+  # predicted1 <- predict(model1,pheno1.prs, type="response")
+  # auc$all=as.numeric(auc(pheno1.prs$y,predicted1,quiet=T))
   
   pheno2.prs=pheno1.prs[pheno1.prs$ID %in% famtrain[,1],]
   #model2 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=pheno2.prs,family = "binomial")
@@ -600,20 +630,20 @@ getauc=function(mymodel=sl_nonl)
   auc$val=as.numeric(auc(pheno3.prs$y,predicted3,quiet=T))
   print(auc)
   auc_val=data.frame(auc=auc$val,auc_low=0,auc_high=0)
-  library(boot)
-  AUCBoot = function(data,indices){
-    boot_data = data[indices, ]
-    #model4 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=boot_data,family = "binomial")
-    model4 <- glm(y~prs, data=boot_data,family = "binomial")
-    predicted4 <- predict(model4,boot_data, type="response")
-    auc=as.numeric(auc(boot_data$y,predicted4,quiet=T))
-    return(c(auc))
-  }
-  boot_auc = boot(data =pheno3.prs, statistic = AUCBoot, R = 1000)
-  tmp=boot.ci(boot_auc,type="perc")
-  auc_val$auc_low=tmp$percent[4]
-  auc_val$auc_high=tmp$percent[5]
-  print(auc_val)
+  # library(boot)
+  # AUCBoot = function(data,indices){
+  #   boot_data = data[indices, ]
+  #   #model4 <- glm(y~prs+AGE+EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, data=boot_data,family = "binomial")
+  #   model4 <- glm(y~prs, data=boot_data,family = "binomial")
+  #   predicted4 <- predict(model4,boot_data, type="response")
+  #   auc=as.numeric(auc(boot_data$y,predicted4,quiet=T))
+  #   return(c(auc))
+  # }
+  # boot_auc = boot(data =pheno3.prs, statistic = AUCBoot, R = 1000)
+  # tmp=boot.ci(boot_auc,type="perc")
+  # auc_val$auc_low=tmp$percent[4]
+  # auc_val$auc_high=tmp$percent[5]
+  # print(auc_val)
   return(list(auc=auc,auc_val=auc_val,allprs=allprs))
   
 }
@@ -638,7 +668,7 @@ res=list(prs_mat_eb=prs_mat_eb,best_snps=best_snps,sl_linear1=sl_linear1,sl_line
          aucres_linear1=aucres_linear1,aucres_linear2=aucres_linear2,aucres_linear3=aucres_linear3,aucres_linear4=aucres_linear4,
          aucres_linear5=aucres_linear5,aucres_linear6=aucres_linear6,
          train_val_list=train_val_list)
-save(res,file=paste0(out_dir,outprefix,"_runsuper_linear_comb.RData"))
+save(res,file=paste0(out_dir,outprefix,"_runsuper_linear_comb1.RData"))
 #runsuper_new1.RData: AUC adjust for all covariates
 #runsuper_prs.RData: AUC adjust for nothing
 #runsuper_linear.RData: linear learner

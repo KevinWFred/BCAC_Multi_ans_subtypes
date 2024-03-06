@@ -64,6 +64,13 @@ write.table(allprefix,file="../result/PRS1/tuning_validation_plink_mergelist.txt
 plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
 cmd=paste0(plink," --keep-allele-order --allow-no-sex --merge-list ../result/PRS1/tuning_validation_plink_mergelist.txt --make-bed --out ../result/PRS1/tuning_validation --memory 100000 --threads 8")
 system(cmd)
+
+#merge tuning
+allprefix=c("../result/PRS1/euro_onco_tuning","../result/PRS1/asian_onco_tuning")
+write.table(allprefix,file="../result/PRS1/tuning2_plink_mergelist.txt",row.names = F,col.names = F,quote=F)
+plink="/usr/local/apps/plink/1.9.0-beta4.4/plink"
+cmd=paste0(plink," --keep-allele-order --allow-no-sex --merge-list ../result/PRS1/tuning2_plink_mergelist.txt --make-bed --out ../result/PRS1/tuning2 --memory 100000 --threads 8")
+system(cmd)
 # #genotype data align with 1kG A1
 # bim=fread("../../tools/CTSLEB/EAS/chr_all.bim")
 # #use chr:pos:A1:A2 to align sumdat and bim
