@@ -1,6 +1,10 @@
 #!/usr/bin/env Rscript
 #subtype=NULL: canceroutcome; nonNULL:subtype
 .libPaths(c("/data/wangx53",.libPaths()))
+.libPaths(c("/data/BB_Bioinformatics/Kevin/tools/Rpackages",.libPaths()))
+library(SuperLearner)
+library(ranger)
+library(glmnet)
 setwd("/data/BB_Bioinformatics/Kevin/BCAC/code")
 
 set.seed(1000)
@@ -25,6 +29,7 @@ phenoicogs=cbind(phenoicogs,tmp[idx,2:11])
 phenoicogs$y=NA
 phenoicogs$y[which(phenoicogs$Behaviour1==1)]=1
 phenoicogs$y[which(is.na(phenoicogs$Behaviour1))]=0
+phenoicogs=phenoicogs[,c("ID",paste0("pc",1:10),c("Behaviour1","ER_status1","PR_status1","HER2_status1","Grade1","age","y"))]
 
 phenoonco=read.table("../data/concept_750_zhang_onco_pheno_v15_02_corrected_age.txt",header=T,sep="\t")
 phenoonco$ID=phenoonco$Onc_ID
@@ -32,6 +37,7 @@ colnames(phenoonco)=gsub("PC_","pc",colnames(phenoonco))
 phenoonco$y=NA
 phenoonco$y[which(phenoonco$Behaviour1==1)]=1
 phenoonco$y[which(is.na(phenoonco$Behaviour1))]=0
+phenoonco=phenoonco[,c("ID",paste0("pc",1:10),c("Behaviour1","ER_status1","PR_status1","HER2_status1","Grade1","age","y"))]
 
 subtypes=c("LumA","LumB","LumB_HN","Her2E","TripN")
 call_subtype=function(pheno=phenoicogs)
@@ -76,13 +82,25 @@ prefix_val4="../result/PRS1/euro_onco_validation"
 prefix_val5="../result/PRS1/hispanic_onco_validation"
 validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
 
+#val afr has duplicated samples in icogs/onco
+fam_afr_icogs_val=read.table(paste0(prefix_val2,".fam"))
+idx=match(fam_afr_icogs_val$V2,phenoicogs$ID)
+table(phenoicogs$ID[idx] %in% phenoonco$ID)
+phenoonco1=phenoonco[!phenoonco$ID %in% fam_afr_icogs_val$V2,]
+#all fam val contains in phenoval
+phenoval=rbind(phenoonco1,phenoicogs[idx,])
+
 get_pheno.prs=function(prs=prs$V6,famval,subtype=NULL)
 {
-  phenotype=phenoicogs
-  if (!all(famval$V2 %in% phenoicogs$ID))
-  {
-    phenotype=phenoonco
-  }
+  # phenotype=phenoonco[,c("ID",paste0("pc",1:10),"age","Behaviour1","y",subtype)]
+  # if (!all(famval$V2 %in% phenoonco$ID))
+  # {
+  #   tmp=famval$V2[!famval$V2 %in% phenoonco$ID]
+  #   idx=match(tmp,phenoicogs$ID)
+  #   phenotype0=phenoicogs[idx,c("ID",paste0("pc",1:10),"age","Behaviour1","y",subtype)]
+  #   phenotype=rbind(phenotype,phenotype0)
+  # }
+  phenotype=phenoval
   phenotype=phenotype[match(famval$V2,phenotype$ID),]
   if (!is.null(subtype))
   {
@@ -98,6 +116,7 @@ get_pheno.prs=function(prs=prs$V6,famval,subtype=NULL)
   pheno.prs=pheno.prs[,c("ID",paste0("pc",1:10),"age","Behaviour1","y","prs")]
   return(pheno.prs)
 }
+
 myscale=function(pheno.prs)
 {
   idx=which(is.na(pheno.prs$Behaviour1)) #control
@@ -225,6 +244,7 @@ AUCadjBoot = function(data,indices){
 #combine icogs/onco african
 #allprs is a list of 4 val PRS dataframe
 #allfamval is a list of 4 val fam dataframe
+#methodprefix is part of the result file name (adding to outprefix)
 get_valauc=function(allprs,allfamval,outprefix,methodprefix="CT",subtype=NULL)
 {
   #validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
@@ -1046,6 +1066,7 @@ write.csv(PRScsx_table,file="../result/PRS1/prscsx/PRScsx_table.csv")
 
 #CTSLEB
 #results from CTSLEB_super
+#target is part of result filename
 CTSLEBprs=function(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EAS/EAS_CTSLEB_runsuper_linear_comb.RData",
        target="EAS",outdir="../result/PRS1/",subtype=NULL)
 {
@@ -1058,7 +1079,7 @@ CTSLEBprs=function(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/
   }
   idx_optimal=which.max(auctun)
   print(paste0("idx_optimal: ",idx_optimal))
-  #including all the prs
+  #prsmat including all the prs
   prsmat=res[[idx_optimal+8]]$allprs
   allprs=allfamval=list()
   for (i in 1:5)
@@ -1070,8 +1091,18 @@ CTSLEBprs=function(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/
     prs=prsmat[idx,2]
     allprs[[i]]=prs
   }
-  CTsleb=get_valauc(allprs,allfamval,outprefix=paste0(outdir,target),methodprefix="CTSLEB",subtype=subtype)
+  if (is.null(subtype))
+  {
+    save(allprs,prsmat,file=paste0(outdir,"CTSLEB_",target,"_allprs.RData"))
+  }else
+  {
+    save(allprs,prsmat,file=paste0(outdir,"CTSLEB_",target,"_",subtype,"_allprs.RData"))
+  }
+  
+  #CTsleb=get_valauc(allprs,allfamval,outprefix=paste0(outdir,target),methodprefix="CTSLEB",subtype=subtype)
 }
+CTSLEBprs(superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS1/ctsleb/EAS/EAS_CTSLEB_runsuper_linear_comb.RData",
+                   target="EAS",outdir="../result/PRS1/",subtype=NULL)
 EASCTslebprs=read.table("../result/PRS1/EAS_CTSLEB_valauc.txt",header=T)
 EASCTsleb_table=get_auctable(aucres=EASCTslebprs)
 write.csv(EASCTsleb_table,file="../result/PRS1/ctsleb/EASCTsleb_table.csv",row.names = F)
@@ -1118,7 +1149,104 @@ for (i in 1:length(targets))
     CTSLEBprs_wrap(superresfile=superresfile,target=target,subtype=subtype)
   }
 }
+
+#tuning use EUR and EAS
+for (j in 1:length(subtypes))
+{
+  #superresfile="/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/asian/LumA/asian_LumA_runsuper_linear_comb1.RData"
+  subtype=subtypes[j]
+  print(paste0(subtype))
+  superresfile=paste0("/data/BB_Bioinformatics/Kevin/BCAC/result/PRS_subtype/ctsleb/euro/",subtype,"/","EUREAS_CTSLEB_",subtype,"_runsuper_linear_comb1.RData")
+  CTSLEBprs_wrap(superresfile=superresfile,target="EUREAS",subtype=subtype)
+}
+
+#CTSLEB combined 12 PRS (subtype PRS+total PRS)
+#collect all PRS
+outdirs=c(rep("../result/PRS1/",2),rep("../result/PRS_subtype/ctsleb/",10))
+alltargets=c("EAS","EUR",rep("EAS",5),rep("EUR",5))
+allsubtypes=c("NULL","NULL",subtypes,subtypes)
+allvalprs=list()
+allallprs=list()
+for (i in 1:length(outdirs))
+{
+  outdir=outdirs[i]
+  subtype=allsubtypes[i]
+  target=alltargets[i]
+  if (subtype=="NULL")
+  {
+    prsfile=paste0(outdir,"CTSLEB_",target,"_allprs.RData")
+  }else
+  {
+    prsfile=paste0(outdir,"CTSLEB_",target,"_",subtype,"_allprs.RData")
+  }
+  load(prsfile)
+  allvalprs[[i]]=allprs
+  allallprs[[i]]=prsmat
+}
+famtun_euro=read.table("../result/PRS1/euro_onco_tuning.fam")
+famtun_asian=read.table("../result/PRS1/asian_onco_tuning.fam")
+table(famtun_euro$V2 %in% allallprs[[10]][,1])
+table(famtun_asian$V2 %in% allallprs[[10]][,1])
+famtun2=rbind(famtun_asian,famtun_euro)
+prstun=data.frame(matrix(NA,nrow=nrow(famtun2),ncol=12))
+rownames(prstun)=famtun2$V2
+colnames(prstun)=c("EAS","EUR",paste0("EAS_",subtypes),paste0("EUR_",subtypes))
+for (i in 1:12)
+{
+   idx=match(famtun2$V2,allallprs[[i]][,1])  
+   prstun[,i]=allallprs[[i]][idx,2]
+}
+
+prsval0=list()
+for (i in 1:5)
+{
+  tmp=NULL
+  for (j in 1:12)
+  {
+    tmp=cbind(tmp,allvalprs[[j]][[i]])
+  }
+  colnames(tmp)=colnames(prstun)
+  prsval0[[i]]=tmp
+}
+
+sl_prs=function(subtype=NULL,outdir="../result/PRS1/")
+{
+  idx=match(rownames(prstun),phenoonco$ID)
+  phenotype=phenoonco[idx,]
+  if (!is.null(subtype))
+  {
+    phenotype$y=phenotype[,subtype]
+  }
+  idx=is.na(phenotype$y)
+  phenotype=phenotype[!idx,]
+  prstun1=prstun[!idx,]
+  sl_linear <- SuperLearner(Y = phenotype$y, 
+                             X = prstun1, 
+                             family = binomial(),
+                             method="method.AUC",
+                             SL.library = c("SL.glmnet","SL.lm"))
+  prsval=allfamval=list()
+  for (i in 1:5)
+  {
+    famval=read.table(paste0(validationprefix[i],".fam"))
+    allfamval[[i]]=famval
+    prsval[[i]]=predict(sl_linear,prsval0[[i]], onlySL = TRUE)[[1]][,1]
+  }
+  CTsleb_sl=get_valauc(allprs=prsval,allfamval,outprefix=paste0(outdir,"SL_"),methodprefix="CTSLEB",subtype=subtype)
+  outprefix1=paste0(outdir,"SL_CTSLEB")
+  if (!is.null(subtype)) outprefix1=paste0(outprefix1,"_",subtype)
+  aucval=read.table(paste0(outprefix1,"_valauc.txt"),header=T)
+  aucval_table=get_auctable(aucres=aucval)
+  write.csv(aucval_table,file=paste0(outprefix1,"_table.csv"))
+}
+sl_prs(subtype=NULL,outdir="../result/PRS1/")
+for (i in 1:length(subtypes))
+{
+  sl_prs(subtype=subtypes[i],outdir="../result/PRS_subtype/ctsleb/")
+}
   
+
+
 #PRSCSx on subtypes
 PRScsx_subtype=function(subtype="LumA",outfolder="../result/PRS_subtype/prscsx/LumA/")
 {

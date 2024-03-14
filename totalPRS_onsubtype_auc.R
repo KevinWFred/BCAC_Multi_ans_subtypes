@@ -67,6 +67,20 @@ addsubtype=function(pheno=phenoicogs)
 phenoicogs=addsubtype(pheno=phenoicogs)
 phenoonco=addsubtype(pheno=phenoonco)
 
+#get the phenotype for validation (there are duplicated sampleid in onco/icogs, affect val afr)
+prefix_val1="../result/PRS1/african_onco_validation"
+prefix_val2="../result/PRS1/african_icogs_validation"
+prefix_val3="../result/PRS1/asian_onco_validation"
+prefix_val4="../result/PRS1/euro_onco_validation"
+prefix_val5="../result/PRS1/hispanic_onco_validation"
+validationprefix=c(prefix_val1,prefix_val2,prefix_val3,prefix_val4,prefix_val5)
+fam_afr_icogs_val=read.table(paste0(prefix_val2,".fam"))
+idx=match(fam_afr_icogs_val$V2,phenoicogs$ID)
+table(phenoicogs$ID[idx] %in% phenoonco$ID)
+phenoonco1=phenoonco[!phenoonco$ID %in% fam_afr_icogs_val$V2,]
+#all fam val contains in phenoval
+phenoval=rbind(phenoonco1,phenoicogs[idx,])
+sum(duplicated(phenoval$ID)) #0
 AUCBoot = function(data,indices){
   if (max(data$y,na.rm=T)!=1) data$y=data$y-1 #y:1,2-->0,1
   boot_data = data[indices, ]
@@ -131,26 +145,39 @@ get_subtypeauc=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
   #combine 2 AF, change prs to array if need
   if ("numeric" %in% class(allres$allprs[[1]])) #array
   {
-    allres1$allprs[[1]]=c(allres$allprs[[1]],allres$allprs[[2]])
-    allres1$allprs[[2]]=allres$allprs[[3]]
-    allres1$allprs[[3]]=allres$allprs[[4]]
-    allres1$allprs[[4]]=allres$allprs[[5]]
+    if (length(allres$allprs)==5)
+    {
+      allres1$allprs[[1]]=c(allres$allprs[[1]],allres$allprs[[2]])
+      allres1$allprs[[2]]=allres$allprs[[3]]
+      allres1$allprs[[3]]=allres$allprs[[4]]
+      allres1$allprs[[4]]=allres$allprs[[5]]
+    }
     
   }else
   {
-    allres1$allprs[[1]]=rbind(allres$allprs[[1]],allres$allprs[[2]])
-    allres1$allprs[[1]]=allres1$allprs[[1]][,ncol(allres$allprs[[1]])]
-    allres1$allprs[[2]]=allres$allprs[[3]]
-    allres1$allprs[[2]]=allres1$allprs[[2]][,ncol(allres$allprs[[1]])]
-    allres1$allprs[[3]]=allres$allprs[[4]]
-    allres1$allprs[[3]]=allres1$allprs[[3]][,ncol(allres$allprs[[1]])]
-    allres1$allprs[[4]]=allres$allprs[[5]]
-    allres1$allprs[[4]]=allres1$allprs[[4]][,ncol(allres$allprs[[1]])]
+    if (length(allres$allprs)==5)
+    {
+      allres1$allprs[[1]]=rbind(allres$allprs[[1]],allres$allprs[[2]])
+      allres1$allprs[[1]]=allres1$allprs[[1]][,ncol(allres$allprs[[1]])]
+      allres1$allprs[[2]]=allres$allprs[[3]]
+      allres1$allprs[[2]]=allres1$allprs[[2]][,ncol(allres$allprs[[1]])]
+      allres1$allprs[[3]]=allres$allprs[[4]]
+      allres1$allprs[[3]]=allres1$allprs[[3]][,ncol(allres$allprs[[1]])]
+      allres1$allprs[[4]]=allres$allprs[[5]]
+      allres1$allprs[[4]]=allres1$allprs[[4]][,ncol(allres$allprs[[1]])]
+    }
   }
-  allres1$allfamval[[1]]=rbind(allres$allfamval[[1]],allres$allfamval[[2]])
-  allres1$allfamval[[2]]=allres$allfamval[[3]]
-  allres1$allfamval[[3]]=allres$allfamval[[4]]
-  allres1$allfamval[[4]]=allres$allfamval[[5]]
+  if (length(allres$allprs)==5)
+  {
+    allres1$allfamval[[1]]=rbind(allres$allfamval[[1]],allres$allfamval[[2]])
+    allres1$allfamval[[2]]=allres$allfamval[[3]]
+    allres1$allfamval[[3]]=allres$allfamval[[4]]
+    allres1$allfamval[[4]]=allres$allfamval[[5]]
+  }
+  if(length(allres$allprs)==4)
+  {
+    allres1=allres
+  }
   
   aucres=data.frame(matrix(NA,nrow=4,ncol=5))
   colnames(aucres)=colnames(phenoicogs)[17:21]
@@ -164,8 +191,11 @@ get_subtypeauc=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
     {
       prs=prs[,ncol(prs)]
     }
-    pheno=phenoonco
-    if (i==1) pheno=rbind(phenoicogs,phenoonco)
+    #comsamples=intersect(phenoicogs$ID,phenoonco$ID)
+    # pheno=phenoonco
+    # if (i==1) pheno=rbind(phenoicogs,phenoonco)
+    #val AFR came from icogs and onco, other val came from onco
+    pheno=phenoval
     idx=match(famval$V1,pheno$ID)
     for (j in 1:5)
     {
@@ -182,10 +212,12 @@ get_subtypeauc=function(outprefix="../result/PRS1/Weighted",methodprefix="CT")
   allaucres=list(aucres=aucres,aucreslow=aucreslow,aucreshigh=aucreshigh)
   save(allaucres,file=paste0(outprefix,"_",methodprefix,"_valauc_onsubtypes.RData"))
 }
-
+get_subtypeauc(outprefix="../result/PRS1/Weighted",methodprefix="CT")
 get_subtypeauc(outprefix="../result/PRS1/Weighted",methodprefix="LDpred")
 get_subtypeauc(outprefix="../result/PRS1/TargetEUR",methodprefix="PRScsx")
 get_subtypeauc(outprefix="../result/PRS1/TargetEAS",methodprefix="PRScsx")
+get_subtypeauc(outprefix="../result/PRS1/EUR",methodprefix="CTSLEB")
+get_subtypeauc(outprefix="../result/PRS1/EAS",methodprefix="CTSLEB")
 
 get_auctable=function(outprefix="../result/PRS1/Weighted",methodprefix="CT",optwrite=T)
 {
@@ -210,15 +242,17 @@ get_auctable=function(outprefix="../result/PRS1/Weighted",methodprefix="CT",optw
   }
   
 }
+get_auctable(outprefix="../result/PRS1/Weighted",methodprefix="CT")
 get_auctable(outprefix="../result/PRS1/Weighted",methodprefix="LDpred")
 get_auctable(outprefix="../result/PRS1/TargetEUR",methodprefix="PRScsx")
 get_auctable(outprefix="../result/PRS1/TargetEAS",methodprefix="PRScsx")
-
+get_auctable(outprefix="../result/PRS1/EUR",methodprefix="CTSLEB")
+get_auctable(outprefix="../result/PRS1/EAS",methodprefix="CTSLEB")
 #use EUR and EAS tables to get only one (most populations use EUR results; EAS use EAS )
 get_2auctable=function(outprefix1="../result/PRS1/TargetEUR",
                        outprefix2="../result/PRS1/TargetEAS",
                        outprefix="../result/PRS1/Target2", #output
-                       methodprefix="PRScsx")
+                       methodprefix="PRScsx",optwrite=T)
 {
   alltable1=get_auctable(outprefix=outprefix1,methodprefix=methodprefix,optwrite=F)
   alltable2=get_auctable(outprefix=outprefix2,methodprefix=methodprefix,optwrite=F)
@@ -234,3 +268,8 @@ get_2auctable=function(outprefix1="../result/PRS1/TargetEUR",
     return(alltable)
   }
 }
+get_2auctable()
+get_2auctable(outprefix1="../result/PRS1/EUR",
+                       outprefix2="../result/PRS1/EAS",
+                       outprefix="../result/PRS1/Target2", #output
+                       methodprefix="CTSLEB")
